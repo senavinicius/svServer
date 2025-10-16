@@ -223,4 +223,17 @@ app.post('/api/ssl/renew', async (req, res) => {
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
+
+  // Detectar e informar modo de desenvolvimento
+  const isDev = process.platform !== 'linux' || process.env.MOCK_MODE === 'true';
+  if (isDev) {
+    console.log('');
+    console.log('⚠️  DEVELOPMENT MODE ACTIVE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔧 Reason: Running on non-Linux platform or MOCK_MODE=true');
+    console.log('📝 Using mock data instead of real Apache configuration');
+    console.log('💡 To disable: Run on Linux server without MOCK_MODE variable');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('');
+  }
 });
