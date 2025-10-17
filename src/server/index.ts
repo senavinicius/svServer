@@ -1,7 +1,6 @@
 import express from 'express';
 import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL } from './manager.js';
-import { isDevelopmentMode } from './mock-data.js';
 import type { CreateDomainDto, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
 
 const app = express();
@@ -59,32 +58,6 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
 }
 
 // ============ ROTAS DA API ============
-
-/**
- * GET /api/status - Retorna o status do servidor (dev/prod)
- */
-app.get('/api/status', (_req, res) => {
-  const isDev = isDevelopmentMode();
-  const response: ApiResponse<{
-    mode: 'development' | 'production';
-    platform: string;
-    mockMode: boolean;
-    reason?: string;
-  }> = {
-    success: true,
-    data: {
-      mode: isDev ? 'development' : 'production',
-      platform: process.platform,
-      mockMode: process.env.MOCK_MODE === 'true',
-      reason: isDev
-        ? (process.platform !== 'linux'
-            ? `Running on ${process.platform} (not Linux)`
-            : 'MOCK_MODE environment variable is set')
-        : undefined,
-    },
-  };
-  res.json(response);
-});
 
 /**
  * GET /api/domains - Lista todos os domínios
@@ -249,27 +222,5 @@ app.post('/api/ssl/renew', async (req, res) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log('');
   console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('');
-
-  // Detectar e informar modo de desenvolvimento/produção
-  if (isDevelopmentMode()) {
-    console.log('⚠️  DEVELOPMENT/TEST MODE ACTIVE');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`🖥️  Platform: ${process.platform}`);
-    console.log(`🔧 MOCK_MODE: ${process.env.MOCK_MODE || 'not set'}`);
-    console.log('📝 Using mock data instead of real Apache configuration');
-    console.log('💡 To use real Apache: Run on Linux without MOCK_MODE=true');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  } else {
-    console.log('✅ PRODUCTION MODE');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🖥️  Platform: Linux');
-    console.log('📝 Using real Apache configuration from /etc/httpd/conf.d/');
-    console.log('🔒 Apache commands will be executed with sudo');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  }
-  console.log('');
 });

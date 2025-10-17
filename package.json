@@ -1,7 +1,7 @@
 {
   "name": "ec2-manager",
   "private": true,
-  "version": "0.0.2",
+  "version": "0.0.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "svframework": "github:senavinicius/svFramework"
+    "express": "^5.1.0"
   }
 }

@@ -85,20 +85,3 @@ export async function renewSSL(domain: string): Promise<void> {
     body: JSON.stringify({ domain }),
   });
 }
-
-/**
- * Obtém o status do servidor (dev/prod)
- */
-export async function getServerStatus(): Promise<{
-  mode: 'development' | 'production';
-  platform: string;
-  mockMode: boolean;
-  reason?: string;
-}> {
-  return apiFetch<{
-    mode: 'development' | 'production';
-    platform: string;
-    mockMode: boolean;
-    reason?: string;
-  }>('/api/status');
-}

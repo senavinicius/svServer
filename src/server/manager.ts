@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { CreateDomainDto, UpdateDomainDto } from '../shared/types.js';
-import { isDevelopmentMode, mockDelay } from './mock-data.js';
 
 const execAsync = promisify(exec);
 
@@ -70,13 +69,6 @@ export async function addDomain(dto: CreateDomainDto): Promise<void> {
     throw new Error('DocumentRoot é obrigatório para domínios Static');
   }
 
-  // Modo de desenvolvimento: simula operação
-  if (isDevelopmentMode()) {
-    console.log('🔧 Development mode: simulando addDomain', dto);
-    await mockDelay();
-    return;
-  }
-
   // Gerar configuração
   let vhostConfig: string;
   if (dto.type === 'node') {
@@ -101,13 +93,6 @@ export async function addDomain(dto: CreateDomainDto): Promise<void> {
  * Remove um domínio do Apache
  */
 export async function removeDomain(serverName: string): Promise<void> {
-  // Modo de desenvolvimento: simula operação
-  if (isDevelopmentMode()) {
-    console.log('🔧 Development mode: simulando removeDomain', serverName);
-    await mockDelay();
-    return;
-  }
-
   if (!existsSync(VHOST_HTTP_PATH)) {
     throw new Error('Arquivo de configuração não encontrado');
   }
@@ -139,13 +124,6 @@ export async function removeDomain(serverName: string): Promise<void> {
  * Atualiza um domínio existente
  */
 export async function updateDomain(serverName: string, dto: UpdateDomainDto): Promise<void> {
-  // Modo de desenvolvimento: simula operação
-  if (isDevelopmentMode()) {
-    console.log('🔧 Development mode: simulando updateDomain', serverName, dto);
-    await mockDelay();
-    return;
-  }
-
   if (!existsSync(VHOST_HTTP_PATH)) {
     throw new Error('Arquivo de configuração não encontrado');
   }
@@ -199,13 +177,6 @@ export async function obtainSSL(domain: string): Promise<void> {
     throw new Error('Domínio inválido');
   }
 
-  // Modo de desenvolvimento: simula operação
-  if (isDevelopmentMode()) {
-    console.log('🔧 Development mode: simulando obtainSSL', domain);
-    await mockDelay(1500); // SSL demora mais
-    return;
-  }
-
   // Executar certbot
   await execAsync(`sudo certbot --apache -d ${domain} --non-interactive --agree-tos --redirect`);
 }
@@ -216,13 +187,6 @@ export async function obtainSSL(domain: string): Promise<void> {
 export async function renewSSL(domain: string): Promise<void> {
   if (!validateDomain(domain)) {
     throw new Error('Domínio inválido');
-  }
-
-  // Modo de desenvolvimento: simula operação
-  if (isDevelopmentMode()) {
-    console.log('🔧 Development mode: simulando renewSSL', domain);
-    await mockDelay(1500); // SSL demora mais
-    return;
   }
 
   // Renovar certificado específico

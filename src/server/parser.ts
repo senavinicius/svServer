@@ -1,7 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
 import type { VirtualHost, DomainType, SSLInfo } from '../shared/types.js';
 import { createHash } from 'crypto';
-import { isDevelopmentMode, MOCK_VHOSTS } from './mock-data.js';
 
 const VHOST_HTTP_PATH = '/etc/httpd/conf.d/vhost.conf';
 const VHOST_HTTPS_PATH = '/etc/httpd/conf.d/vhost-le-ssl.conf';
@@ -170,10 +169,9 @@ export async function loadSSLInfo(): Promise<Map<string, SSLInfo>> {
  * Combina VirtualHosts HTTP e HTTPS, aplicando informações SSL
  */
 export async function getAllVirtualHosts(): Promise<VirtualHost[]> {
-  // Modo de desenvolvimento: retorna dados mockados
-  if (isDevelopmentMode()) {
-    console.log('🔧 Development mode: usando dados mockados');
-    return MOCK_VHOSTS;
+  // Verificar se os arquivos existem
+  if (!existsSync(VHOST_HTTP_PATH) && !existsSync(VHOST_HTTPS_PATH)) {
+    throw new Error(`Arquivos de configuração do Apache não encontrados. Procurado em: ${VHOST_HTTP_PATH} e ${VHOST_HTTPS_PATH}`);
   }
 
   const httpVhosts = parseApacheConfig(VHOST_HTTP_PATH);
