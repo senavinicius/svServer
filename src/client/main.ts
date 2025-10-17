@@ -1,11 +1,17 @@
 import './style.css';
-import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL } from './api.js';
+import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getServerStatus } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDto } from '../shared/types.js';
 
 // ============ STATE ============
 let domains: Domain[] = [];
 let isLoading = false;
 let error: string | null = null;
+let serverStatus: {
+  mode: 'development' | 'production';
+  platform: string;
+  mockMode: boolean;
+  reason?: string;
+} | null = null;
 
 // ============ MODAL STATE ============
 let isModalOpen = false;
@@ -165,10 +171,48 @@ function renderModal(): string {
   `;
 }
 
+function renderStatusBanner(): string {
+  if (!serverStatus) {
+    return '';
+  }
+
+  if (serverStatus.mode === 'development') {
+    return `
+      <div class="status-banner development">
+        <div class="status-banner-icon">⚠️</div>
+        <div class="status-banner-content">
+          <div class="status-banner-title">MODO DE TESTE/DESENVOLVIMENTO ATIVO</div>
+          <div class="status-banner-info">
+            Plataforma: ${serverStatus.platform} |
+            Usando dados mockados (mock) ao invés da configuração real do Apache |
+            ${serverStatus.reason || 'Rodando em ambiente de desenvolvimento'}
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    return `
+      <div class="status-banner production">
+        <div class="status-banner-icon">✅</div>
+        <div class="status-banner-content">
+          <div class="status-banner-title">MODO DE PRODUÇÃO</div>
+          <div class="status-banner-info">
+            Plataforma: Linux |
+            Usando configuração real do Apache em /etc/httpd/conf.d/ |
+            Comandos Apache serão executados com sudo
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
 function render() {
   const app = document.getElementById('app')!;
 
   app.innerHTML = `
+    ${renderStatusBanner()}
+
     <div class="container">
       <div class="header">
         <h1>EC2 Manager</h1>
@@ -360,6 +404,16 @@ async function loadDomains() {
   }
 }
 
+async function loadServerStatus() {
+  try {
+    serverStatus = await getServerStatus();
+    render();
+  } catch (err: any) {
+    console.error('Erro ao carregar status do servidor:', err);
+  }
+}
+
 // ============ INIT ============
 
+loadServerStatus();
 loadDomains();

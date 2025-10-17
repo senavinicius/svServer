@@ -61,6 +61,32 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
 // ============ ROTAS DA API ============
 
 /**
+ * GET /api/status - Retorna o status do servidor (dev/prod)
+ */
+app.get('/api/status', (_req, res) => {
+  const isDev = isDevelopmentMode();
+  const response: ApiResponse<{
+    mode: 'development' | 'production';
+    platform: string;
+    mockMode: boolean;
+    reason?: string;
+  }> = {
+    success: true,
+    data: {
+      mode: isDev ? 'development' : 'production',
+      platform: process.platform,
+      mockMode: process.env.MOCK_MODE === 'true',
+      reason: isDev
+        ? (process.platform !== 'linux'
+            ? `Running on ${process.platform} (not Linux)`
+            : 'MOCK_MODE environment variable is set')
+        : undefined,
+    },
+  };
+  res.json(response);
+});
+
+/**
  * GET /api/domains - Lista todos os domínios
  */
 app.get('/api/domains', async (_req, res) => {
