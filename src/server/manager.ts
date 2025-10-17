@@ -200,28 +200,42 @@ export async function renewSSL(domain: string): Promise<void> {
 export async function replaceConfigFile(type: 'http' | 'https', content: string): Promise<void> {
   const filePath = type === 'http' ? VHOST_HTTP_PATH : VHOST_HTTPS_PATH;
   const backupPath = `${filePath}.backup.${Date.now()}`;
+  const tempPath = `/tmp/vhost-upload-${Date.now()}.conf`;
 
   // Validação básica: verificar se contém tags VirtualHost
   if (!content.includes('<VirtualHost') || !content.includes('</VirtualHost>')) {
     throw new Error('Arquivo inválido: deve conter pelo menos um bloco <VirtualHost>');
   }
 
+  // Escrever conteúdo em arquivo temporário (não precisa de sudo)
+  try {
+    writeFileSync(tempPath, content, 'utf-8');
+    console.log(`Arquivo temporário criado: ${tempPath}`);
+  } catch (error) {
+    throw new Error(`Falha ao criar arquivo temporário: ${error}`);
+  }
+
   // Fazer backup do arquivo atual se existir
   if (existsSync(filePath)) {
     try {
-      copyFileSync(filePath, backupPath);
+      await execAsync(`sudo cp ${filePath} ${backupPath}`);
       console.log(`Backup criado: ${backupPath}`);
     } catch (error) {
+      // Limpar arquivo temporário
+      try { await execAsync(`rm -f ${tempPath}`); } catch {}
       throw new Error(`Falha ao criar backup: ${error}`);
     }
   }
 
-  // Escrever novo conteúdo temporariamente
+  // Copiar arquivo temporário para o destino final (com sudo)
   try {
-    writeFileSync(filePath, content, 'utf-8');
-    console.log(`Arquivo escrito: ${filePath}`);
+    await execAsync(`sudo cp ${tempPath} ${filePath}`);
+    await execAsync(`sudo chmod 644 ${filePath}`);
+    console.log(`Arquivo copiado para: ${filePath}`);
   } catch (error) {
-    throw new Error(`Falha ao escrever arquivo: ${error}`);
+    // Limpar arquivo temporário
+    try { await execAsync(`rm -f ${tempPath}`); } catch {}
+    throw new Error(`Falha ao copiar arquivo: ${error}`);
   }
 
   // Validar configuração com apachectl configtest
@@ -237,9 +251,15 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   } catch (error: any) {
     // Restaurar backup em caso de erro
     if (existsSync(backupPath)) {
-      copyFileSync(backupPath, filePath);
-      console.log(`Backup restaurado devido a erro de validação`);
+      try {
+        await execAsync(`sudo cp ${backupPath} ${filePath}`);
+        console.log(`Backup restaurado devido a erro de validação`);
+      } catch (restoreError) {
+        console.error('Erro ao restaurar backup:', restoreError);
+      }
     }
+    // Limpar arquivo temporário
+    try { await execAsync(`rm -f ${tempPath}`); } catch {}
     throw new Error(`Validação falhou: ${error.message || error}`);
   }
 
@@ -250,10 +270,24 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   } catch (error: any) {
     // Restaurar backup se reload falhar
     if (existsSync(backupPath)) {
-      copyFileSync(backupPath, filePath);
-      await execAsync('sudo systemctl reload httpd'); // tentar recarregar com backup
-      console.log(`Backup restaurado devido a erro no reload`);
+      try {
+        await execAsync(`sudo cp ${backupPath} ${filePath}`);
+        await execAsync('sudo systemctl reload httpd'); // tentar recarregar com backup
+        console.log(`Backup restaurado devido a erro no reload`);
+      } catch (restoreError) {
+        console.error('Erro ao restaurar backup:', restoreError);
+      }
     }
+    // Limpar arquivo temporário
+    try { await execAsync(`rm -f ${tempPath}`); } catch {}
     throw new Error(`Falha ao recarregar Apache: ${error.message || error}`);
+  }
+
+  // Limpar arquivo temporário
+  try {
+    await execAsync(`rm -f ${tempPath}`);
+    console.log('Arquivo temporário removido');
+  } catch (error) {
+    console.warn('Aviso: não foi possível remover arquivo temporário:', tempPath);
   }
 }
