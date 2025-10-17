@@ -104,11 +104,23 @@ function renderDomain(domain: Domain): string {
 
 function renderDomainsList(): string {
   if (isLoading) {
-    return '<div class="loading">Carregando...</div>';
+    return '<div class="loading">⏳ Carregando domínios...</div>';
   }
 
   if (error) {
-    return `<div class="error">${error}</div>`;
+    return `
+      <div class="error">
+        <h3>❌ Erro ao carregar domínios</h3>
+        <p><strong>Detalhes:</strong> ${error}</p>
+        <p><strong>Possíveis causas:</strong></p>
+        <ul>
+          <li>Arquivos de configuração do Apache não encontrados</li>
+          <li>Sem permissão para ler os arquivos</li>
+          <li>Servidor Apache não configurado</li>
+        </ul>
+        <p><strong>Dica:</strong> Clique em "🔍 Diagnóstico" para ver mais detalhes</p>
+      </div>
+    `;
   }
 
   if (domains.length === 0) {
@@ -116,11 +128,17 @@ function renderDomainsList(): string {
       <div class="empty-state">
         <h3>Nenhum domínio configurado</h3>
         <p>Clique em "Adicionar Domínio" para começar</p>
+        <p><strong>Ou:</strong> Clique em "🔍 Diagnóstico" para verificar se os arquivos de configuração existem</p>
       </div>
     `;
   }
 
-  return domains.map(renderDomain).join('');
+  return `
+    <div class="domains-count">
+      <strong>Total de domínios:</strong> ${domains.length}
+    </div>
+    ${domains.map(renderDomain).join('')}
+  `;
 }
 
 function renderModal(): string {
@@ -168,15 +186,48 @@ function renderModal(): string {
 }
 
 function renderDiagnostics(): string {
-  if (!showDiagnostics || !diagnostics) {
+  if (!showDiagnostics) {
     return '';
+  }
+
+  if (!diagnostics) {
+    return `
+      <div class="diagnostics-panel">
+        <h3>🔍 Diagnóstico do Sistema</h3>
+        <div class="loading">⏳ Carregando diagnóstico...</div>
+      </div>
+    `;
   }
 
   const { server, apache, ssl } = diagnostics;
 
+  // Verificar problemas
+  const problems = [];
+  if (!apache.httpConfigExists && !apache.httpsConfigExists) {
+    problems.push('⛔ NENHUM arquivo de configuração do Apache encontrado!');
+  }
+  if (!apache.httpConfigExists) {
+    problems.push(`❌ Arquivo HTTP não encontrado: ${apache.httpConfigPath}`);
+  }
+  if (!apache.httpsConfigExists) {
+    problems.push(`⚠️ Arquivo HTTPS não encontrado: ${apache.httpsConfigPath}`);
+  }
+  if (!ssl.renewalDirExists) {
+    problems.push(`⚠️ Diretório SSL não encontrado: ${ssl.renewalDirPath}`);
+  }
+
   return `
     <div class="diagnostics-panel">
       <h3>🔍 Diagnóstico do Sistema</h3>
+
+      ${problems.length > 0 ? `
+        <div class="diag-problems">
+          <h4>⚠️ Problemas Detectados:</h4>
+          <ul>
+            ${problems.map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '<div class="diag-success">✅ Todos os arquivos necessários foram encontrados!</div>'}
 
       <div class="diag-section">
         <h4>Servidor</h4>
@@ -192,13 +243,13 @@ function renderDiagnostics(): string {
         <h4>Arquivos de Configuração Apache</h4>
         <ul>
           <li>
-            <strong>HTTP Config:</strong>
             ${apache.httpConfigExists ? '✅' : '❌'}
+            <strong>HTTP Config:</strong>
             ${apache.httpConfigPath}
           </li>
           <li>
-            <strong>HTTPS Config:</strong>
             ${apache.httpsConfigExists ? '✅' : '❌'}
+            <strong>HTTPS Config:</strong>
             ${apache.httpsConfigPath}
           </li>
         </ul>
@@ -208,8 +259,8 @@ function renderDiagnostics(): string {
         <h4>SSL / Let's Encrypt</h4>
         <ul>
           <li>
-            <strong>Diretório de Renovação:</strong>
             ${ssl.renewalDirExists ? '✅' : '❌'}
+            <strong>Diretório de Renovação:</strong>
             ${ssl.renewalDirPath}
           </li>
         </ul>

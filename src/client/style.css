@@ -341,3 +341,71 @@ body {
   color: #9ca3af;
   font-size: 12px;
 }
+
+.diag-problems {
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.diag-problems h4 {
+  color: #991b1b;
+  margin-bottom: 12px;
+}
+
+.diag-problems ul {
+  list-style: none;
+  padding: 0;
+}
+
+.diag-problems li {
+  padding: 8px 0;
+  color: #7f1d1d;
+  font-weight: 500;
+}
+
+.diag-success {
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+  color: #166534;
+  font-weight: 600;
+}
+
+.domains-count {
+  padding: 12px 20px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.error {
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.error h3 {
+  color: #991b1b;
+  margin-bottom: 12px;
+}
+
+.error p {
+  color: #7f1d1d;
+  margin-bottom: 8px;
+}
+
+.error ul {
+  margin-left: 20px;
+  color: #7f1d1d;
+}
+
+.error li {
+  margin: 4px 0;
+}
