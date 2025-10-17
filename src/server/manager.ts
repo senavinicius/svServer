@@ -249,6 +249,15 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
       throw new Error(`Configuração inválida: ${output}`);
     }
   } catch (error: any) {
+    // Salvar arquivo com erro para inspeção
+    const errorPath = `${filePath}.error`;
+    try {
+      await execAsync(`sudo cp ${filePath} ${errorPath}`);
+      console.log(`Arquivo com erro salvo em: ${errorPath}`);
+    } catch (saveError) {
+      console.error('Erro ao salvar arquivo com erro:', saveError);
+    }
+
     // Restaurar backup em caso de erro
     if (existsSync(backupPath)) {
       try {
@@ -260,7 +269,7 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     }
     // Limpar arquivo temporário
     try { await execAsync(`rm -f ${tempPath}`); } catch {}
-    throw new Error(`Validação falhou: ${error.message || error}`);
+    throw new Error(`Validação falhou: ${error.message || error}\n\nArquivo com erro salvo em: ${errorPath}`);
   }
 
   // Se chegou aqui, tudo OK - recarregar Apache
