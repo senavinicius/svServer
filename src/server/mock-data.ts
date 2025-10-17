@@ -1,7 +1,5 @@
 import type { VirtualHost } from '../shared/types.js';
 
-let devModeLogged = false;
-
 /**
  * Dados mockados para desenvolvimento local (Mac/Windows)
  */
@@ -89,24 +87,10 @@ export const MOCK_VHOSTS: VirtualHost[] = [
 
 /**
  * Detecta se estamos em ambiente de desenvolvimento (não é Linux)
+ * IMPORTANTE: Não loga nada aqui - isso é feito no index.ts durante a inicialização
  */
 export function isDevelopmentMode(): boolean {
-  const isDev = process.platform !== 'linux' || process.env.MOCK_MODE === 'true';
-
-  if (isDev && !devModeLogged) {
-    console.log('');
-    console.log('⚠️  DEVELOPMENT/TEST MODE ACTIVE');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`🖥️  Platform: ${process.platform}`);
-    console.log(`🔧 MOCK_MODE env: ${process.env.MOCK_MODE || 'not set'}`);
-    console.log('📝 Using mock data instead of real Apache configuration');
-    console.log('💡 To disable: Run on Linux server without MOCK_MODE variable');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('');
-    devModeLogged = true;
-  }
-
-  return isDev;
+  return process.platform !== 'linux' || process.env.MOCK_MODE === 'true';
 }
 
 /**
