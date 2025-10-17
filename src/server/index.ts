@@ -7,6 +7,35 @@ import type { CreateDomainDto, UpdateDomainDto, ApiResponse, Domain, VirtualHost
 const app = express();
 const PORT = process.env.PORT || 3100;
 
+// Verificar arquivos APENAS UMA VEZ na inicialização
+function checkSystemFiles() {
+  const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
+  const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
+  const sslDirExists = existsSync('/etc/letsencrypt/renewal');
+
+  return {
+    server: {
+      platform: process.platform,
+      nodeVersion: process.version,
+      pid: process.pid,
+      uptime: process.uptime(),
+    },
+    apache: {
+      httpConfigExists: httpExists,
+      httpConfigPath: '/etc/httpd/conf.d/vhost.conf',
+      httpsConfigExists: httpsExists,
+      httpsConfigPath: '/etc/httpd/conf.d/vhost-le-ssl.conf',
+    },
+    ssl: {
+      renewalDirExists: sslDirExists,
+      renewalDirPath: '/etc/letsencrypt/renewal',
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+const systemStatus = checkSystemFiles();
+
 // Middleware
 app.use(express.json());
 app.use(express.static('dist')); // Servir frontend buildado
@@ -64,33 +93,15 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
  * GET /api/diagnostics - Retorna informações de diagnóstico do sistema
  */
 app.get('/api/diagnostics', (_req, res) => {
-  const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
-  const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
-  const sslDirExists = existsSync('/etc/letsencrypt/renewal');
-
-  const diagnostics = {
-    server: {
-      platform: process.platform,
-      nodeVersion: process.version,
-      pid: process.pid,
-      uptime: process.uptime(),
-    },
-    apache: {
-      httpConfigExists: httpExists,
-      httpConfigPath: '/etc/httpd/conf.d/vhost.conf',
-      httpsConfigExists: httpsExists,
-      httpsConfigPath: '/etc/httpd/conf.d/vhost-le-ssl.conf',
-    },
-    ssl: {
-      renewalDirExists: sslDirExists,
-      renewalDirPath: '/etc/letsencrypt/renewal',
-    },
-    timestamp: new Date().toISOString(),
-  };
-
-  const response: ApiResponse<typeof diagnostics> = {
+  const response: ApiResponse<typeof systemStatus> = {
     success: true,
-    data: diagnostics,
+    data: {
+      ...systemStatus,
+      server: {
+        ...systemStatus.server,
+        uptime: process.uptime(), // Atualizar uptime
+      },
+    },
   };
 
   res.json(response);
@@ -262,33 +273,30 @@ app.listen(PORT, () => {
   console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
   console.log('');
 
-  // Verificar arquivos necessários
-  const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
-  const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
-  const sslDirExists = existsSync('/etc/letsencrypt/renewal');
+  const { apache, ssl } = systemStatus;
 
-  if (!httpExists && !httpsExists) {
+  if (!apache.httpConfigExists && !apache.httpsConfigExists) {
     console.log('⛔ ERRO: Nenhum arquivo de configuração Apache encontrado!');
-    console.log('   Procurado: /etc/httpd/conf.d/vhost.conf');
-    console.log('   Procurado: /etc/httpd/conf.d/vhost-le-ssl.conf');
+    console.log(`   Procurado: ${apache.httpConfigPath}`);
+    console.log(`   Procurado: ${apache.httpsConfigPath}`);
   } else {
-    if (!httpExists) {
-      console.log('⚠️  AVISO: /etc/httpd/conf.d/vhost.conf não encontrado');
+    if (!apache.httpConfigExists) {
+      console.log(`⚠️  AVISO: ${apache.httpConfigPath} não encontrado`);
     } else {
-      console.log('✅ /etc/httpd/conf.d/vhost.conf encontrado');
+      console.log(`✅ ${apache.httpConfigPath} encontrado`);
     }
 
-    if (!httpsExists) {
-      console.log('⚠️  AVISO: /etc/httpd/conf.d/vhost-le-ssl.conf não encontrado');
+    if (!apache.httpsConfigExists) {
+      console.log(`⚠️  AVISO: ${apache.httpsConfigPath} não encontrado`);
     } else {
-      console.log('✅ /etc/httpd/conf.d/vhost-le-ssl.conf encontrado');
+      console.log(`✅ ${apache.httpsConfigPath} encontrado`);
     }
   }
 
-  if (!sslDirExists) {
-    console.log('⚠️  AVISO: /etc/letsencrypt/renewal não encontrado (SSL não configurado)');
+  if (!ssl.renewalDirExists) {
+    console.log(`⚠️  AVISO: ${ssl.renewalDirPath} não encontrado (SSL não configurado)`);
   } else {
-    console.log('✅ /etc/letsencrypt/renewal encontrado');
+    console.log(`✅ ${ssl.renewalDirPath} encontrado`);
   }
 
   console.log('');
