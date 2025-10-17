@@ -104,6 +104,12 @@ app.get('/api/diagnostics', (_req, res) => {
     },
   };
 
+  console.log('[API /api/diagnostics] Retornando:', {
+    httpExists: systemStatus.apache.httpConfigExists,
+    httpsExists: systemStatus.apache.httpsConfigExists,
+    sslExists: systemStatus.ssl.renewalDirExists,
+  });
+
   res.json(response);
 });
 
