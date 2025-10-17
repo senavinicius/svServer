@@ -334,10 +334,11 @@ app.post('/api/config/upload/:type', async (req, res) => {
     }
 
     // Substituir arquivo com validação
-    await replaceConfigFile(type as 'http' | 'https', content);
+    const result = await replaceConfigFile(type as 'http' | 'https', content);
 
     const response: ApiResponse = {
       success: true,
+      data: result,
     };
 
     res.json(response);

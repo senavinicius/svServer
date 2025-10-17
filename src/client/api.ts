@@ -97,8 +97,8 @@ export async function getDiagnostics(): Promise<any> {
 /**
  * Faz upload de arquivo de configuração com validação
  */
-export async function uploadConfigFile(type: 'http' | 'https', content: string): Promise<void> {
-  return apiFetch<void>(`/api/config/upload/${type}`, {
+export async function uploadConfigFile(type: 'http' | 'https', content: string): Promise<{ message: string; validationOutput: string }> {
+  return apiFetch<{ message: string; validationOutput: string }>(`/api/config/upload/${type}`, {
     method: 'POST',
     body: JSON.stringify({ content }),
   });

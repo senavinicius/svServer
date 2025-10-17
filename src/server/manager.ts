@@ -197,7 +197,7 @@ export async function renewSSL(domain: string): Promise<void> {
 /**
  * Substitui arquivo de configuração com validação
  */
-export async function replaceConfigFile(type: 'http' | 'https', content: string): Promise<void> {
+export async function replaceConfigFile(type: 'http' | 'https', content: string): Promise<{ message: string; validationOutput: string }> {
   const filePath = type === 'http' ? VHOST_HTTP_PATH : VHOST_HTTPS_PATH;
   const backupPath = `${filePath}.backup.${Date.now()}`;
   const tempPath = `/tmp/vhost-upload-${Date.now()}.conf`;
@@ -239,16 +239,24 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   }
 
   // Validar configuração com apachectl configtest
-  try {
-    const { stdout, stderr } = await execAsync('apachectl configtest 2>&1');
-    console.log('apachectl configtest output:', stdout || stderr);
+  let validationOutput = '';
+  let isValid = false;
 
-    // Verificar se a saída indica sucesso (Syntax OK)
-    const output = stdout + stderr;
-    if (!output.includes('Syntax OK')) {
-      throw new Error(`Configuração inválida: ${output}`);
-    }
+  try {
+    const result = await execAsync('apachectl configtest 2>&1');
+    validationOutput = result.stdout + result.stderr;
   } catch (error: any) {
+    // apachectl configtest pode retornar exit code != 0 mesmo com warnings
+    // O importante é verificar se tem "Syntax OK" na saída
+    validationOutput = (error.stdout || '') + (error.stderr || '');
+  }
+
+  console.log('apachectl configtest output:', validationOutput);
+
+  // Verificar se a saída contém "Syntax OK"
+  isValid = validationOutput.includes('Syntax OK');
+
+  if (!isValid) {
     // Salvar arquivo com erro para inspeção
     const errorPath = `${filePath}.error`;
     try {
@@ -269,10 +277,10 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     }
     // Limpar arquivo temporário
     try { await execAsync(`rm -f ${tempPath}`); } catch {}
-    throw new Error(`Validação falhou: ${error.message || error}\n\nArquivo com erro salvo em: ${errorPath}`);
+    throw new Error(`Validação falhou: ${validationOutput}\n\nArquivo com erro salvo em: ${errorPath}`);
   }
 
-  // Se chegou aqui, tudo OK - recarregar Apache
+  // Se chegou aqui, validação passou - recarregar Apache
   try {
     await execAsync('sudo systemctl reload httpd');
     console.log('Apache recarregado com sucesso');
@@ -299,4 +307,10 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   } catch (error) {
     console.warn('Aviso: não foi possível remover arquivo temporário:', tempPath);
   }
+
+  // Retornar sucesso com output da validação
+  return {
+    message: 'Arquivo substituído e Apache recarregado com sucesso',
+    validationOutput: validationOutput
+  };
 }

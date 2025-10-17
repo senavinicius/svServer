@@ -339,16 +339,22 @@ async function uploadConfig(type: 'http' | 'https') {
       btn.textContent = 'Enviando...';
 
       // Fazer upload
-      await uploadConfigFile(type, content);
+      const result = await uploadConfigFile(type, content);
 
       // Recarregar domínios após upload bem-sucedido
       await loadDomains();
 
-      alert(`✅ Arquivo ${fileName} substituído com sucesso!\nApache recarregado.`);
+      // Mostrar resultado com output da validação
+      console.log('Apache validation output:', result.validationOutput);
+      alert(
+        `✅ ${result.message}\n\n` +
+        `Validação do Apache:\n${result.validationOutput}`
+      );
 
       btn.disabled = false;
       btn.textContent = originalText;
     } catch (err: any) {
+      console.error('Upload error:', err);
       alert(`❌ Erro ao enviar arquivo:\n\n${err.message}\n\nO arquivo anterior foi mantido.`);
 
       // Restaurar botão
