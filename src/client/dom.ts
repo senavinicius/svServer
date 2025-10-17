@@ -43,7 +43,9 @@ export function addDataAttributeListeners<K extends keyof HTMLElementEventMap>(
   handler: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any
 ): void {
   document.querySelectorAll(`[${dataAttribute}]`).forEach(element => {
-    element.addEventListener(event, handler);
+    if (element instanceof HTMLElement) {
+      element.addEventListener(event, handler);
+    }
   });
 }
 
