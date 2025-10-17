@@ -31,7 +31,7 @@ export interface Domain {
 }
 
 // DTOs para API
-export interface CreateDomainDto {
+export interface CreateDomainDTO {
   serverName: string;
   type: 'node' | 'static';
   port?: number; // obrigatório se type === 'node'

@@ -7,7 +7,17 @@ const VHOST_HTTPS_PATH = '/etc/httpd/conf.d/vhost-le-ssl.conf';
 const LETSENCRYPT_RENEWAL_PATH = '/etc/letsencrypt/renewal';
 
 /**
+ * Representa um bloco VirtualHost parseado (antes de expandir por domínio)
+ */
+interface ParsedVHostBlock {
+  rawConfig: string;
+  domains: string[]; // ServerName + todos ServerAlias
+  directives: Map<string, string[]>; // Diretiva -> valores
+}
+
+/**
  * Parseia um arquivo de configuração do Apache e extrai todos os VirtualHosts
+ * Gera um VirtualHost por domínio (ServerName + cada ServerAlias)
  */
 export function parseApacheConfig(configPath: string): VirtualHost[] {
   if (!existsSync(configPath)) {
@@ -15,22 +25,22 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
   }
 
   const content = readFileSync(configPath, 'utf-8');
+  const blocks = extractVirtualHostBlocks(content);
   const vhosts: VirtualHost[] = [];
 
-  // Regex para extrair blocos <VirtualHost>...</VirtualHost>
-  const vhostRegex = /<VirtualHost[^>]*>([\s\S]*?)<\/VirtualHost>/gi;
-  let match;
+  for (const block of blocks) {
+    // Se não há domínios, pula
+    if (block.domains.length === 0) continue;
 
-  while ((match = vhostRegex.exec(content)) !== null) {
-    const vhostBlock = match[1];
-    const rawConfig = match[0];
+    // Domínio principal (primeiro encontrado, geralmente ServerName)
+    const primaryDomain = block.domains[0];
 
-    const serverName = extractDirective(vhostBlock, 'ServerName');
-    if (!serverName) continue; // Ignora VirtualHosts sem ServerName
-
-    const vhost = parseVirtualHost(serverName, vhostBlock, rawConfig);
-    if (vhost) {
-      vhosts.push(vhost);
+    // Gerar um VirtualHost para cada domínio
+    for (const domain of block.domains) {
+      const vhost = createVirtualHost(domain, primaryDomain, block);
+      if (vhost) {
+        vhosts.push(vhost);
+      }
     }
   }
 
@@ -38,51 +48,231 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
 }
 
 /**
- * Parseia um bloco VirtualHost individual
+ * Extrai todos os blocos <VirtualHost>...</VirtualHost> do conteúdo
  */
-function parseVirtualHost(serverName: string, block: string, rawConfig: string): VirtualHost | null {
-  const type = detectDomainType(block);
-  const port = extractProxyPort(block);
-  const documentRoot = extractDirective(block, 'DocumentRoot');
-  const errorLog = extractDirective(block, 'ErrorLog');
-  const accessLog = extractDirective(block, 'CustomLog')?.split(' ')[0];
+function extractVirtualHostBlocks(content: string): ParsedVHostBlock[] {
+  const blocks: ParsedVHostBlock[] = [];
+  const vhostRegex = /<\s*VirtualHost\b([^>]*)>([\s\S]*?)<\/\s*VirtualHost\s*>/gi;
+  let match;
 
-  const { isSubdomain, parentDomain } = analyzeServerName(serverName);
+  while ((match = vhostRegex.exec(content)) !== null) {
+    const rawConfig = match[0]; // Bloco completo com tags
+    const innerContent = match[2]; // Conteúdo interno (match[1] é o header, match[2] é o body)
 
-  // Gerar ID único baseado no ServerName
-  const id = createHash('md5').update(serverName).digest('hex').substring(0, 8);
+    const directives = parseDirectives(innerContent);
+    const domains = extractAllDomains(directives);
+
+    blocks.push({
+      rawConfig,
+      domains,
+      directives,
+    });
+  }
+
+  return blocks;
+}
+
+/**
+ * Parseia todas as diretivas de um bloco VirtualHost
+ * Suporta:
+ * - Comentários (#)
+ * - Diretivas multi-linha
+ * - Tabs e espaços variados
+ * - Ordem arbitrária
+ */
+function parseDirectives(content: string): Map<string, string[]> {
+  const directives = new Map<string, string[]>();
+  const lines = content.split('\n');
+
+  let currentDirective: string | null = null;
+  let currentValue = '';
+
+  for (let line of lines) {
+    // Remove comentários (preserva apenas a parte antes do #)
+    const commentIndex = line.indexOf('#');
+    if (commentIndex !== -1) {
+      line = line.substring(0, commentIndex);
+    }
+
+    // Normaliza espaços
+    line = line.trim();
+
+    // Pula linhas vazias
+    if (!line) {
+      if (currentDirective && currentValue) {
+        addDirective(directives, currentDirective, currentValue.trim());
+        currentDirective = null;
+        currentValue = '';
+      }
+      continue;
+    }
+
+    // Detecta início de diretiva (palavra no início da linha, suporta hífen)
+    const directiveMatch = line.match(/^([A-Za-z][A-Za-z0-9_-]*)\s+(.*)/);
+
+    if (directiveMatch) {
+      // Finaliza diretiva anterior se houver
+      if (currentDirective && currentValue) {
+        addDirective(directives, currentDirective, currentValue.trim());
+      }
+
+      // Nova diretiva
+      currentDirective = directiveMatch[1];
+      currentValue = directiveMatch[2];
+
+      // Se a linha parece completa (não termina com \), salva já
+      if (!currentValue.endsWith('\\')) {
+        addDirective(directives, currentDirective, currentValue.trim());
+        currentDirective = null;
+        currentValue = '';
+      } else {
+        // Remove \ e continua
+        currentValue = currentValue.slice(0, -1).trim() + ' ';
+      }
+    } else if (currentDirective) {
+      // Continuação de diretiva multi-linha
+      if (line.endsWith('\\')) {
+        currentValue += line.slice(0, -1).trim() + ' ';
+      } else {
+        currentValue += line;
+        addDirective(directives, currentDirective, currentValue.trim());
+        currentDirective = null;
+        currentValue = '';
+      }
+    }
+  }
+
+  // Finaliza última diretiva se houver
+  if (currentDirective && currentValue) {
+    addDirective(directives, currentDirective, currentValue.trim());
+  }
+
+  // Parse blocos aninhados (<Directory>, <Location>, <Proxy>, <IfModule>, etc.)
+  // Isso garante que não perdemos diretivas importantes que estão dentro de blocos
+  const nestedBlockRegex = /<([A-Za-z]+)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+  let nestedMatch;
+  while ((nestedMatch = nestedBlockRegex.exec(content)) !== null) {
+    const innerDirectives = parseDirectives(nestedMatch[2]);
+    // Mescla as diretivas encontradas no bloco aninhado
+    for (const [key, values] of innerDirectives) {
+      for (const value of values) {
+        addDirective(directives, key, value);
+      }
+    }
+  }
+
+  return directives;
+}
+
+/**
+ * Adiciona uma diretiva ao mapa (suporta múltiplos valores)
+ */
+function addDirective(map: Map<string, string[]>, directive: string, value: string): void {
+  const key = directive.toLowerCase();
+  if (!map.has(key)) {
+    map.set(key, []);
+  }
+  map.get(key)!.push(value);
+}
+
+/**
+ * Extrai todos os domínios (ServerName + ServerAlias)
+ */
+function extractAllDomains(directives: Map<string, string[]>): string[] {
+  const domains: string[] = [];
+
+  // ServerName (pode ter apenas 1)
+  const serverNames = directives.get('servername') || [];
+  if (serverNames.length > 0) {
+    domains.push(serverNames[0]);
+  }
+
+  // ServerAlias (pode ter múltiplos, separados por espaço)
+  const serverAliases = directives.get('serveralias') || [];
+  for (const aliasLine of serverAliases) {
+    // Cada ServerAlias pode ter múltiplos domínios separados por espaço
+    const aliases = aliasLine.split(/\s+/).filter(a => a.length > 0);
+    domains.push(...aliases);
+  }
+
+  return domains;
+}
+
+/**
+ * Cria um VirtualHost a partir de um domínio e bloco parseado
+ */
+function createVirtualHost(
+  domain: string,
+  primaryDomain: string,
+  block: ParsedVHostBlock
+): VirtualHost | null {
+  const { directives, rawConfig } = block;
+
+  const type = detectDomainType(directives);
+  const port = extractProxyPort(directives);
+  const documentRoot = getFirstDirective(directives, 'documentroot');
+  const errorLog = getFirstDirective(directives, 'errorlog');
+  const customLog = getFirstDirective(directives, 'customlog');
+  const accessLog = customLog ? customLog.split(/\s+/)[0] : undefined;
+
+  const { isSubdomain, parentDomain } = analyzeServerName(domain);
+
+  // ID único baseado no domínio
+  const id = createHash('md5').update(domain).digest('hex').substring(0, 8);
+
+  // Detecta SSL no próprio bloco (certificados manuais ou Let's Encrypt)
+  const hasSSL = directives.has('sslengine') ||
+                 directives.has('sslcertificatefile') ||
+                 directives.has('sslcertificatekeyfile');
+
+  const sslEngine = getFirstDirective(directives, 'sslengine');
+  const sslEnabled = hasSSL && (!sslEngine || sslEngine.toLowerCase() === 'on');
 
   return {
     id,
-    serverName,
+    serverName: domain,
     type,
     port,
     documentRoot,
     errorLog,
     accessLog,
     isSubdomain,
-    parentDomain,
-    ssl: { enabled: false, status: 'none' }, // Será atualizado depois
+    parentDomain: parentDomain || (domain !== primaryDomain ? primaryDomain : undefined),
+    ssl: sslEnabled ? { enabled: true, status: 'active' } : { enabled: false, status: 'none' },
     rawConfig,
   };
 }
 
 /**
- * Detecta o tipo de domínio baseado no conteúdo do VirtualHost
+ * Obtém o primeiro valor de uma diretiva
  */
-function detectDomainType(block: string): DomainType {
-  // Node: tem ProxyPass
-  if (/ProxyPass/i.test(block)) {
+function getFirstDirective(directives: Map<string, string[]>, name: string): string | undefined {
+  const values = directives.get(name.toLowerCase());
+  return values && values.length > 0 ? values[0] : undefined;
+}
+
+/**
+ * Detecta o tipo de domínio baseado nas diretivas
+ */
+function detectDomainType(directives: Map<string, string[]>): DomainType {
+  // Node: tem ProxyPass ou ProxyPassMatch
+  if (directives.has('proxypass') || directives.has('proxypassmatch')) {
     return 'node';
   }
 
-  // PHP: tem handlers PHP ou módulos PHP
-  if (/AddHandler.*php|SetHandler.*php|php_/i.test(block)) {
-    return 'php';
+  // PHP: tem AddHandler/SetHandler com php ou diretivas php_*
+  for (const [key, values] of directives) {
+    if (key.startsWith('php_')) {
+      return 'php';
+    }
+    if ((key === 'addhandler' || key === 'sethandler') &&
+        values.some(v => /php/i.test(v))) {
+      return 'php';
+    }
   }
 
-  // Static: tem DocumentRoot mas não é PHP
-  if (/DocumentRoot/i.test(block)) {
+  // Static: tem DocumentRoot
+  if (directives.has('documentroot')) {
     return 'static';
   }
 
@@ -90,20 +280,24 @@ function detectDomainType(block: string): DomainType {
 }
 
 /**
- * Extrai a porta do ProxyPass
+ * Extrai a porta do ProxyPass (suporta várias variações)
  */
-function extractProxyPort(block: string): number | undefined {
-  const match = block.match(/ProxyPass\s+\/\s+http:\/\/127\.0\.0\.1:(\d+)/i);
-  return match ? parseInt(match[1], 10) : undefined;
-}
+function extractProxyPort(directives: Map<string, string[]>): number | undefined {
+  // Combina ProxyPass e ProxyPassMatch
+  const proxyLines = [
+    ...(directives.get('proxypass') || []),
+    ...(directives.get('proxypassmatch') || [])
+  ];
 
-/**
- * Extrai uma diretiva do Apache
- */
-function extractDirective(block: string, directive: string): string | undefined {
-  const regex = new RegExp(`${directive}\\s+(.+)`, 'i');
-  const match = block.match(regex);
-  return match ? match[1].trim() : undefined;
+  for (const proxyLine of proxyLines) {
+    // Suporta: http://127.0.0.1:3000, http://localhost:3000, ws://..., wss://...
+    const match = proxyLine.match(/(?:https?|wss?):\/\/(?:127\.0\.0\.1|localhost):(\d+)/i);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+
+  return undefined;
 }
 
 /**

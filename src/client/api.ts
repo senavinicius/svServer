@@ -1,4 +1,4 @@
-import type { Domain, CreateDomainDto, UpdateDomainDto, ApiResponse, VirtualHost } from '../shared/types.js';
+import type { Domain, CreateDomainDTO, UpdateDomainDto, ApiResponse, VirtualHost } from '../shared/types.js';
 
 // Usar URL relativa quando em produção (mesma origem do frontend)
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -41,7 +41,7 @@ export async function getVirtualHosts(): Promise<VirtualHost[]> {
 /**
  * Adiciona um novo domínio
  */
-export async function addDomain(dto: CreateDomainDto): Promise<void> {
+export async function addDomain(dto: CreateDomainDTO): Promise<void> {
   return apiFetch<void>('/api/domains', {
     method: 'POST',
     body: JSON.stringify(dto),

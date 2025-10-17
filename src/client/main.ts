@@ -1,6 +1,6 @@
 import './style.css';
 import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics } from './api.js';
-import type { Domain, VirtualHost, CreateDomainDto } from '../shared/types.js';
+import type { Domain, VirtualHost, CreateDomainDTO } from '../shared/types.js';
 import { renderDomainsList, renderModal, renderSystemStatus } from './render.js';
 
 /**
@@ -182,7 +182,7 @@ async function handleFormSubmit(e: Event) {
  * Handler para adicionar domínio
  */
 async function handleAddDomain(formData: FormData) {
-  const dto: CreateDomainDto = {
+  const dto: CreateDomainDTO = {
     serverName: formData.get('serverName') as string,
     type: formData.get('type') as 'node' | 'static',
     port: formData.get('port') ? parseInt(formData.get('port') as string) : undefined,

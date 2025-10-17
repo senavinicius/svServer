@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { CreateDomainDto, UpdateDomainDto } from '../shared/types.js';
+import type { CreateDomainDTO, UpdateDomainDto } from '../shared/types.js';
 
 const execAsync = promisify(exec);
 
@@ -54,7 +54,7 @@ function generateStaticVirtualHost(serverName: string, documentRoot: string): st
 /**
  * Adiciona um novo domínio ao Apache
  */
-export async function addDomain(dto: CreateDomainDto): Promise<void> {
+export async function addDomain(dto: CreateDomainDTO): Promise<void> {
   // Validar domínio
   if (!validateDomain(dto.serverName)) {
     throw new Error('Domínio inválido');

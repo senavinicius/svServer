@@ -71,7 +71,7 @@ npm run build
 
 ```bash
 # No servidor EC2
-git clone <repo-url>
+git clone <repo-url> ec2-manager
 cd ec2-manager
 npm install
 npm run build

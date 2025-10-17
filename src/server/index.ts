@@ -2,7 +2,7 @@ import express from 'express';
 import { existsSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL } from './manager.js';
-import type { CreateDomainDto, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
+import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
 
 const app = express();
 const PORT = process.env.PORT || 3100;
@@ -163,7 +163,7 @@ app.get('/api/vhosts', async (_req, res) => {
  */
 app.post('/api/domains', async (req, res) => {
   try {
-    const dto: CreateDomainDto = req.body;
+    const dto: CreateDomainDTO = req.body;
 
     await addDomain(dto);
 
