@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { CreateDomainDTO, UpdateDomainDto } from '../shared/types.js';
