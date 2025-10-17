@@ -1,5 +1,5 @@
 import './style.css';
-import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics } from './api.js';
+import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDTO } from '../shared/types.js';
 import { renderDomainsList, renderModal, renderSystemStatus } from './render.js';
 
@@ -37,6 +37,7 @@ function render() {
         <div class="toolbar-left">
           <button class="btn btn-secondary btn-small" id="download-http-btn">⬇ HTTP Config</button>
           <button class="btn btn-secondary btn-small" id="download-https-btn">⬇ HTTPS Config</button>
+          <button class="btn btn-success btn-small" id="upload-http-btn">⬆ Upload HTTP</button>
         </div>
         <button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
       </div>
@@ -63,6 +64,7 @@ function attachEventListeners() {
   document.getElementById('type')?.addEventListener('change', handleTypeChange);
   document.getElementById('download-http-btn')?.addEventListener('click', () => downloadConfig('http'));
   document.getElementById('download-https-btn')?.addEventListener('click', () => downloadConfig('https'));
+  document.getElementById('upload-http-btn')?.addEventListener('click', () => uploadConfig('http'));
 
   // Ações dos domínios (delegação de eventos)
   document.querySelectorAll('[data-action]').forEach(btn => {
@@ -297,6 +299,67 @@ async function loadDiagnostics() {
 function downloadConfig(type: 'http' | 'https') {
   const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
   window.location.href = `${baseUrl}/api/config/download/${type}`;
+}
+
+/**
+ * Upload de arquivo de configuração com validação
+ */
+async function uploadConfig(type: 'http' | 'https') {
+  // Criar input de arquivo dinamicamente
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.conf,text/plain';
+
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    // Confirmar ação
+    const fileName = type === 'http' ? 'vhost.conf' : 'vhost-le-ssl.conf';
+    if (!confirm(
+      `Tem certeza que deseja substituir ${fileName}?\n\n` +
+      `⚠️ Esta ação irá:\n` +
+      `1. Fazer backup do arquivo atual\n` +
+      `2. Validar a configuração com apachectl configtest\n` +
+      `3. Substituir apenas se a validação passar\n` +
+      `4. Recarregar o Apache automaticamente\n\n` +
+      `Continuar?`
+    )) {
+      return;
+    }
+
+    try {
+      // Ler conteúdo do arquivo
+      const content = await file.text();
+
+      // Mostrar loading
+      const btn = document.getElementById(`upload-${type}-btn`) as HTMLButtonElement;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      // Fazer upload
+      await uploadConfigFile(type, content);
+
+      // Recarregar domínios após upload bem-sucedido
+      await loadDomains();
+
+      alert(`✅ Arquivo ${fileName} substituído com sucesso!\nApache recarregado.`);
+
+      btn.disabled = false;
+      btn.textContent = originalText;
+    } catch (err: any) {
+      alert(`❌ Erro ao enviar arquivo:\n\n${err.message}\n\nO arquivo anterior foi mantido.`);
+
+      // Restaurar botão
+      const btn = document.getElementById(`upload-${type}-btn`) as HTMLButtonElement;
+      btn.disabled = false;
+      btn.textContent = btn.textContent?.replace('Enviando...', originalText => originalText);
+    }
+  };
+
+  // Abrir seletor de arquivo
+  input.click();
 }
 
 /**

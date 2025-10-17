@@ -1,7 +1,7 @@
 import express from 'express';
 import { existsSync, readFileSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
-import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL } from './manager.js';
+import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL, replaceConfigFile } from './manager.js';
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
 
 const app = express();
@@ -308,6 +308,45 @@ app.get('/api/config/download/:type', (req, res) => {
     res.send(content);
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/config/upload/:type - Upload de arquivos de configuração com validação
+ */
+app.post('/api/config/upload/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Conteúdo do arquivo é obrigatório'
+      });
+    }
+
+    if (type !== 'http' && type !== 'https') {
+      return res.status(400).json({
+        success: false,
+        error: 'Tipo inválido. Use "http" ou "https"'
+      });
+    }
+
+    // Substituir arquivo com validação
+    await replaceConfigFile(type as 'http' | 'https', content);
+
+    const response: ApiResponse = {
+      success: true,
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    const response: ApiResponse = {
+      success: false,
+      error: error.message,
+    };
+    res.status(400).json(response);
   }
 });
 

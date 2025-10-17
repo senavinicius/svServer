@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { CreateDomainDTO, UpdateDomainDto } from '../shared/types.js';
@@ -6,6 +6,7 @@ import type { CreateDomainDTO, UpdateDomainDto } from '../shared/types.js';
 const execAsync = promisify(exec);
 
 const VHOST_HTTP_PATH = '/etc/httpd/conf.d/vhost.conf';
+const VHOST_HTTPS_PATH = '/etc/httpd/conf.d/vhost-le-ssl.conf';
 
 /**
  * Valida um nome de domínio
@@ -191,4 +192,68 @@ export async function renewSSL(domain: string): Promise<void> {
 
   // Renovar certificado específico
   await execAsync(`sudo certbot renew --cert-name ${domain}`);
+}
+
+/**
+ * Substitui arquivo de configuração com validação
+ */
+export async function replaceConfigFile(type: 'http' | 'https', content: string): Promise<void> {
+  const filePath = type === 'http' ? VHOST_HTTP_PATH : VHOST_HTTPS_PATH;
+  const backupPath = `${filePath}.backup.${Date.now()}`;
+
+  // Validação básica: verificar se contém tags VirtualHost
+  if (!content.includes('<VirtualHost') || !content.includes('</VirtualHost>')) {
+    throw new Error('Arquivo inválido: deve conter pelo menos um bloco <VirtualHost>');
+  }
+
+  // Fazer backup do arquivo atual se existir
+  if (existsSync(filePath)) {
+    try {
+      copyFileSync(filePath, backupPath);
+      console.log(`Backup criado: ${backupPath}`);
+    } catch (error) {
+      throw new Error(`Falha ao criar backup: ${error}`);
+    }
+  }
+
+  // Escrever novo conteúdo temporariamente
+  try {
+    writeFileSync(filePath, content, 'utf-8');
+    console.log(`Arquivo escrito: ${filePath}`);
+  } catch (error) {
+    throw new Error(`Falha ao escrever arquivo: ${error}`);
+  }
+
+  // Validar configuração com apachectl configtest
+  try {
+    const { stdout, stderr } = await execAsync('apachectl configtest 2>&1');
+    console.log('apachectl configtest output:', stdout || stderr);
+
+    // Verificar se a saída indica sucesso (Syntax OK)
+    const output = stdout + stderr;
+    if (!output.includes('Syntax OK')) {
+      throw new Error(`Configuração inválida: ${output}`);
+    }
+  } catch (error: any) {
+    // Restaurar backup em caso de erro
+    if (existsSync(backupPath)) {
+      copyFileSync(backupPath, filePath);
+      console.log(`Backup restaurado devido a erro de validação`);
+    }
+    throw new Error(`Validação falhou: ${error.message || error}`);
+  }
+
+  // Se chegou aqui, tudo OK - recarregar Apache
+  try {
+    await execAsync('sudo systemctl reload httpd');
+    console.log('Apache recarregado com sucesso');
+  } catch (error: any) {
+    // Restaurar backup se reload falhar
+    if (existsSync(backupPath)) {
+      copyFileSync(backupPath, filePath);
+      await execAsync('sudo systemctl reload httpd'); // tentar recarregar com backup
+      console.log(`Backup restaurado devido a erro no reload`);
+    }
+    throw new Error(`Falha ao recarregar Apache: ${error.message || error}`);
+  }
 }

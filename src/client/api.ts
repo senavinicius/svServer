@@ -93,3 +93,13 @@ export async function renewSSL(domain: string): Promise<void> {
 export async function getDiagnostics(): Promise<any> {
   return apiFetch<any>('/api/diagnostics');
 }
+
+/**
+ * Faz upload de arquivo de configuração com validação
+ */
+export async function uploadConfigFile(type: 'http' | 'https', content: string): Promise<void> {
+  return apiFetch<void>(`/api/config/upload/${type}`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
