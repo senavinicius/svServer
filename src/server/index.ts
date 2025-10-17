@@ -260,5 +260,39 @@ app.post('/api/ssl/renew', async (req, res) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
+  const { existsSync } = require('fs');
+
   console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
+  console.log('');
+
+  // Verificar arquivos necessários
+  const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
+  const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
+  const sslDirExists = existsSync('/etc/letsencrypt/renewal');
+
+  if (!httpExists && !httpsExists) {
+    console.log('⛔ ERRO: Nenhum arquivo de configuração Apache encontrado!');
+    console.log('   Procurado: /etc/httpd/conf.d/vhost.conf');
+    console.log('   Procurado: /etc/httpd/conf.d/vhost-le-ssl.conf');
+  } else {
+    if (!httpExists) {
+      console.log('⚠️  AVISO: /etc/httpd/conf.d/vhost.conf não encontrado');
+    } else {
+      console.log('✅ /etc/httpd/conf.d/vhost.conf encontrado');
+    }
+
+    if (!httpsExists) {
+      console.log('⚠️  AVISO: /etc/httpd/conf.d/vhost-le-ssl.conf não encontrado');
+    } else {
+      console.log('✅ /etc/httpd/conf.d/vhost-le-ssl.conf encontrado');
+    }
+  }
+
+  if (!sslDirExists) {
+    console.log('⚠️  AVISO: /etc/letsencrypt/renewal não encontrado (SSL não configurado)');
+  } else {
+    console.log('✅ /etc/letsencrypt/renewal encontrado');
+  }
+
+  console.log('');
 });
