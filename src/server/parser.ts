@@ -20,17 +20,33 @@ interface ParsedVHostBlock {
  * Gera um VirtualHost por domínio (ServerName + cada ServerAlias)
  */
 export function parseApacheConfig(configPath: string): VirtualHost[] {
+  console.log('🔍 [parseApacheConfig] Iniciando parse do arquivo:', configPath);
+
   if (!existsSync(configPath)) {
+    console.log('❌ [parseApacheConfig] Arquivo não existe:', configPath);
     return [];
   }
 
   const content = readFileSync(configPath, 'utf-8');
+  console.log('📄 [parseApacheConfig] Arquivo lido, tamanho:', content.length, 'bytes');
+
   const blocks = extractVirtualHostBlocks(content);
+  console.log('📦 [parseApacheConfig] Blocos extraídos:', blocks.length);
+
   const vhosts: VirtualHost[] = [];
 
   for (const block of blocks) {
+    console.log('🔎 [parseApacheConfig] Processando bloco:', {
+      domains: block.domains,
+      directivesCount: block.directives.size,
+      rawConfigPreview: block.rawConfig.substring(0, 100)
+    });
+
     // Se não há domínios, pula
-    if (block.domains.length === 0) continue;
+    if (block.domains.length === 0) {
+      console.log('⚠️ [parseApacheConfig] Bloco sem domínios, pulando');
+      continue;
+    }
 
     // Domínio principal (primeiro encontrado, geralmente ServerName)
     const primaryDomain = block.domains[0];
@@ -39,11 +55,13 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
     for (const domain of block.domains) {
       const vhost = createVirtualHost(domain, primaryDomain, block);
       if (vhost) {
+        console.log('✅ [parseApacheConfig] VirtualHost criado:', domain);
         vhosts.push(vhost);
       }
     }
   }
 
+  console.log('🎯 [parseApacheConfig] Total de VirtualHosts:', vhosts.length);
   return vhosts;
 }
 
@@ -51,16 +69,31 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
  * Extrai todos os blocos <VirtualHost>...</VirtualHost> do conteúdo
  */
 function extractVirtualHostBlocks(content: string): ParsedVHostBlock[] {
+  console.log('🔍 [extractVirtualHostBlocks] Iniciando extração de blocos');
+
   const blocks: ParsedVHostBlock[] = [];
   const vhostRegex = /<\s*VirtualHost\b([^>]*)>([\s\S]*?)<\/\s*VirtualHost\s*>/gi;
   let match;
+  let matchCount = 0;
 
   while ((match = vhostRegex.exec(content)) !== null) {
+    matchCount++;
     const rawConfig = match[0]; // Bloco completo com tags
     const innerContent = match[2]; // Conteúdo interno (match[1] é o header, match[2] é o body)
 
+    console.log(`📦 [extractVirtualHostBlocks] Match #${matchCount} encontrado:`, {
+      header: match[1],
+      innerContentLength: innerContent.length,
+      rawConfigPreview: rawConfig.substring(0, 150)
+    });
+
     const directives = parseDirectives(innerContent);
     const domains = extractAllDomains(directives);
+
+    console.log(`📋 [extractVirtualHostBlocks] Match #${matchCount} parseado:`, {
+      domains,
+      directivesKeys: Array.from(directives.keys())
+    });
 
     blocks.push({
       rawConfig,
@@ -69,6 +102,7 @@ function extractVirtualHostBlocks(content: string): ParsedVHostBlock[] {
     });
   }
 
+  console.log('✅ [extractVirtualHostBlocks] Total de blocos extraídos:', blocks.length);
   return blocks;
 }
 
@@ -180,12 +214,23 @@ function addDirective(map: Map<string, string[]>, directive: string, value: stri
  * Extrai todos os domínios (ServerName + ServerAlias)
  */
 function extractAllDomains(directives: Map<string, string[]>): string[] {
+  console.log('🔍 [extractAllDomains] Extraindo domínios das diretivas:', {
+    hasServerName: directives.has('servername'),
+    hasServerAlias: directives.has('serveralias'),
+    serverNameValues: directives.get('servername'),
+    serverAliasValues: directives.get('serveralias'),
+    allKeys: Array.from(directives.keys())
+  });
+
   const domains: string[] = [];
 
   // ServerName (pode ter apenas 1)
   const serverNames = directives.get('servername') || [];
   if (serverNames.length > 0) {
+    console.log('✅ [extractAllDomains] ServerName encontrado:', serverNames[0]);
     domains.push(serverNames[0]);
+  } else {
+    console.log('⚠️ [extractAllDomains] Nenhum ServerName encontrado');
   }
 
   // ServerAlias (pode ter múltiplos, separados por espaço)
@@ -193,9 +238,11 @@ function extractAllDomains(directives: Map<string, string[]>): string[] {
   for (const aliasLine of serverAliases) {
     // Cada ServerAlias pode ter múltiplos domínios separados por espaço
     const aliases = aliasLine.split(/\s+/).filter(a => a.length > 0);
+    console.log('✅ [extractAllDomains] ServerAlias encontrado:', aliases);
     domains.push(...aliases);
   }
 
+  console.log('🎯 [extractAllDomains] Total de domínios extraídos:', domains);
   return domains;
 }
 
