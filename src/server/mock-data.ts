@@ -1,5 +1,7 @@
 import type { VirtualHost } from '../shared/types.js';
 
+let devModeLogged = false;
+
 /**
  * Dados mockados para desenvolvimento local (Mac/Windows)
  */
@@ -91,8 +93,7 @@ export const MOCK_VHOSTS: VirtualHost[] = [
 export function isDevelopmentMode(): boolean {
   const isDev = process.platform !== 'linux' || process.env.MOCK_MODE === 'true';
 
-  // Log detalhado na primeira vez
-  if (isDev && !global.__DEV_MODE_LOGGED__) {
+  if (isDev && !devModeLogged) {
     console.log('');
     console.log('⚠️  DEVELOPMENT/TEST MODE ACTIVE');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -102,7 +103,7 @@ export function isDevelopmentMode(): boolean {
     console.log('💡 To disable: Run on Linux server without MOCK_MODE variable');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('');
-    (global as any).__DEV_MODE_LOGGED__ = true;
+    devModeLogged = true;
   }
 
   return isDev;
