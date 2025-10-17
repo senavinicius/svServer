@@ -44,6 +44,8 @@ Dashboard web para gerenciar Apache e Certbot no próprio servidor EC2 t4g.small
 
 ### 1. Desenvolvimento Local (Mac/Windows)
 
+⚠️ **IMPORTANTE**: Esta máquina é apenas para desenvolvimento. O servidor Apache e arquivos de configuração (`/etc/httpd/conf.d/`) estão no servidor EC2 remoto. Nunca execute comandos que tentam acessar arquivos do servidor Apache localmente.
+
 O sistema detecta automaticamente quando está rodando fora do Linux e usa **dados mockados**. Todas as funcionalidades funcionam com simulação!
 
 ```bash

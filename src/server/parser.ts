@@ -109,10 +109,9 @@ function parseDirectives(content: string): Map<string, string[]> {
 
     // Detecta início de diretiva (palavra no início da linha, suporta hífen)
     // Permite espaço opcional após o nome da diretiva
-    // Ignora linhas que parecem ser continuações (começam com símbolos especiais)
     const directiveMatch = line.match(/^([A-Za-z][A-Za-z0-9_-]*)(?:\s+(.*))?$/);
 
-    if (directiveMatch && !line.match(/^[%$@\[]/)) {
+    if (directiveMatch) {
       // Finaliza diretiva anterior se houver
       if (currentDirective && currentValue) {
         addDirective(directives, currentDirective, currentValue.trim());
