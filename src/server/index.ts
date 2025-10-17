@@ -1,4 +1,5 @@
 import express from 'express';
+import { existsSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL } from './manager.js';
 import type { CreateDomainDto, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
@@ -63,8 +64,6 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
  * GET /api/diagnostics - Retorna informações de diagnóstico do sistema
  */
 app.get('/api/diagnostics', (_req, res) => {
-  const { existsSync } = require('fs');
-
   const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
   const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
   const sslDirExists = existsSync('/etc/letsencrypt/renewal');
@@ -260,8 +259,6 @@ app.post('/api/ssl/renew', async (req, res) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  const { existsSync } = require('fs');
-
   console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
   console.log('');
 
