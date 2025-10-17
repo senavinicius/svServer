@@ -1,207 +1,26 @@
 import './style.css';
 import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDto } from '../shared/types.js';
+import { renderDomainsList, renderModal, renderSystemStatus } from './render.js';
 
-// ============ STATE ============
-let domains: Domain[] = [];
-let isLoading = false;
-let error: string | null = null;
-let diagnostics: any = null;
-
-// ============ MODAL STATE ============
-let isModalOpen = false;
-let modalMode: 'add' | 'edit' = 'add';
-let editingVHost: VirtualHost | null = null;
-
-// ============ RENDER FUNCTIONS ============
-
-function renderSSLStatus(vhost: VirtualHost): string {
-  const ssl = vhost.ssl;
-
-  if (ssl.status === 'none') {
-    return `<span class="ssl-status none">❌ Sem SSL</span>`;
+/**
+ * Estado global da aplicação
+ */
+const state = {
+  domains: [] as Domain[],
+  isLoading: false,
+  error: null as string | null,
+  diagnostics: null as any,
+  modal: {
+    isOpen: false,
+    mode: 'add' as 'add' | 'edit',
+    editingVHost: null as VirtualHost | null,
   }
+};
 
-  if (ssl.status === 'expired') {
-    return `<span class="ssl-status expired">❌ Expirado</span>`;
-  }
-
-  if (ssl.status === 'expiring') {
-    return `<span class="ssl-status expiring">⚠️ Expira em ${ssl.daysUntilExpiry} dias</span>`;
-  }
-
-  return `<span class="ssl-status active">✅ SSL Ativo (${ssl.daysUntilExpiry} dias)</span>`;
-}
-
-function renderVirtualHostActions(vhost: VirtualHost): string {
-  const isPhp = vhost.type === 'php';
-
-  let actions = '';
-
-  // Editar (não para PHP)
-  if (!isPhp) {
-    actions += `<button class="btn btn-secondary btn-small" data-action="edit" data-domain="${vhost.serverName}">Editar</button>`;
-  }
-
-  // SSL
-  if (vhost.ssl.status === 'none') {
-    actions += `<button class="btn btn-success btn-small" data-action="obtain-ssl" data-domain="${vhost.serverName}">Obter SSL</button>`;
-  } else {
-    actions += `<button class="btn btn-success btn-small" data-action="renew-ssl" data-domain="${vhost.serverName}">Renovar SSL</button>`;
-  }
-
-  // Remover (não para PHP)
-  if (!isPhp) {
-    actions += `<button class="btn btn-danger btn-small" data-action="delete" data-domain="${vhost.serverName}">Remover</button>`;
-  }
-
-  return actions;
-}
-
-function renderVirtualHost(vhost: VirtualHost, isSubdomain = false): string {
-  const icon = vhost.type === 'node' ? '📡' : vhost.type === 'static' ? '📁' : '🐘';
-  const typeLabel = vhost.type.toUpperCase();
-
-  const target = vhost.type === 'node'
-    ? `Port ${vhost.port}`
-    : vhost.documentRoot || 'N/A';
-
-  const subdoClass = isSubdomain ? 'subdomain' : '';
-  const subdoIndicator = isSubdomain ? '<span class="subdomain-indicator">↳</span>' : '';
-
-  return `
-    <div class="${subdoClass}">
-      <div class="domain-header">
-        <div class="domain-name">
-          ${subdoIndicator}
-          ${icon} ${vhost.serverName}
-          <span class="domain-type ${vhost.type}">${typeLabel}</span>
-        </div>
-      </div>
-      <div class="domain-info">
-        <span><strong>Target:</strong> ${target}</span>
-        ${renderSSLStatus(vhost)}
-      </div>
-      <div class="domain-actions">
-        ${renderVirtualHostActions(vhost)}
-      </div>
-    </div>
-  `;
-}
-
-function renderDomain(domain: Domain): string {
-  const mainVHost = renderVirtualHost(domain.mainHost);
-  const subdomains = domain.subdomains.map(sub => renderVirtualHost(sub, true)).join('');
-
-  return `
-    <div class="domain-card">
-      ${mainVHost}
-      ${subdomains}
-    </div>
-  `;
-}
-
-function renderDomainsList(): string {
-  if (isLoading) {
-    return '<div class="loading">⏳ Carregando domínios...</div>';
-  }
-
-  if (error) {
-    return `<div class="error">❌ Erro: ${error}</div>`;
-  }
-
-  if (domains.length === 0) {
-    return `
-      <div class="empty-state">
-        <p>Nenhum domínio configurado. Clique em "Adicionar Domínio" para começar.</p>
-      </div>
-    `;
-  }
-
-  return domains.map(renderDomain).join('');
-}
-
-function renderModal(): string {
-  const title = modalMode === 'add' ? 'Adicionar Domínio' : 'Editar Domínio';
-  const isNode = editingVHost?.type === 'node' || modalMode === 'add';
-  const isStatic = editingVHost?.type === 'static';
-
-  return `
-    <div class="modal ${isModalOpen ? 'show' : ''}" id="modal">
-      <div class="modal-content">
-        <div class="modal-header">${title}</div>
-        <form id="domain-form">
-          ${modalMode === 'add' ? `
-            <div class="form-group">
-              <label for="serverName">Nome do Domínio</label>
-              <input type="text" id="serverName" name="serverName" placeholder="example.com" required>
-            </div>
-            <div class="form-group">
-              <label for="type">Tipo</label>
-              <select id="type" name="type" required>
-                <option value="node">Node (Proxy)</option>
-                <option value="static">Static (DocumentRoot)</option>
-              </select>
-            </div>
-          ` : ''}
-
-          <div class="form-group ${isNode ? '' : 'hidden'}" id="port-group">
-            <label for="port">Porta</label>
-            <input type="number" id="port" name="port" placeholder="3000" value="${editingVHost?.port || ''}">
-          </div>
-
-          <div class="form-group ${isStatic ? '' : 'hidden'}" id="documentRoot-group">
-            <label for="documentRoot">DocumentRoot</label>
-            <input type="text" id="documentRoot" name="documentRoot" placeholder="/webapp/example/dist" value="${editingVHost?.documentRoot || ''}">
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" id="cancel-btn">Cancelar</button>
-            <button type="submit" class="btn btn-primary">${modalMode === 'add' ? 'Adicionar' : 'Salvar'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
-function renderSystemStatus(): string {
-  if (!diagnostics) {
-    return '';
-  }
-
-  const { apache, ssl } = diagnostics;
-
-  // Verificar problemas
-  const problems = [];
-  if (!apache.httpConfigExists && !apache.httpsConfigExists) {
-    problems.push('⛔ ERRO: Nenhum arquivo de configuração Apache encontrado!');
-    problems.push(`   → ${apache.httpConfigPath}`);
-    problems.push(`   → ${apache.httpsConfigPath}`);
-  } else {
-    if (!apache.httpConfigExists) {
-      problems.push(`⚠️  ${apache.httpConfigPath} não encontrado`);
-    }
-    if (!apache.httpsConfigExists) {
-      problems.push(`⚠️  ${apache.httpsConfigPath} não encontrado`);
-    }
-  }
-
-  if (!ssl.renewalDirExists) {
-    problems.push(`⚠️  ${ssl.renewalDirPath} não encontrado (SSL não configurado)`);
-  }
-
-  if (problems.length === 0) {
-    return '';
-  }
-
-  return `
-    <div class="system-status error">
-      ${problems.map(p => `<div>${p}</div>`).join('')}
-    </div>
-  `;
-}
-
+/**
+ * Renderiza a aplicação completa
+ */
 function render() {
   const app = document.getElementById('app')!;
 
@@ -212,7 +31,7 @@ function render() {
         <p>Gerenciador de domínios Apache e SSL (Certbot)</p>
       </div>
 
-      ${renderSystemStatus()}
+      ${renderSystemStatus(state.diagnostics)}
 
       <div class="toolbar">
         <div></div>
@@ -220,98 +39,124 @@ function render() {
       </div>
 
       <div class="domains-list">
-        ${renderDomainsList()}
+        ${renderDomainsList(state.domains, state.isLoading, state.error)}
       </div>
     </div>
 
-    ${renderModal()}
+    ${renderModal(state.modal.isOpen, state.modal.mode, state.modal.editingVHost)}
   `;
 
   attachEventListeners();
 }
 
-// ============ EVENT HANDLERS ============
-
+/**
+ * Anexa event listeners aos elementos do DOM
+ */
 function attachEventListeners() {
-  // Botão adicionar domínio
   document.getElementById('add-domain-btn')?.addEventListener('click', openAddModal);
+  document.getElementById('cancel-btn')?.addEventListener('click', closeModal);
+  document.getElementById('modal')?.addEventListener('click', handleModalBackdropClick);
+  document.getElementById('domain-form')?.addEventListener('submit', handleFormSubmit);
+  document.getElementById('type')?.addEventListener('change', handleTypeChange);
 
-  // Ações dos domínios
+  // Ações dos domínios (delegação de eventos)
   document.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', handleDomainAction);
   });
-
-  // Modal
-  document.getElementById('cancel-btn')?.addEventListener('click', closeModal);
-  document.getElementById('modal')?.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).id === 'modal') {
-      closeModal();
-    }
-  });
-
-  // Form
-  document.getElementById('domain-form')?.addEventListener('submit', handleFormSubmit);
-
-  // Toggle campos baseado no tipo
-  document.getElementById('type')?.addEventListener('change', (e) => {
-    const type = (e.target as HTMLSelectElement).value;
-    const portGroup = document.getElementById('port-group')!;
-    const docRootGroup = document.getElementById('documentRoot-group')!;
-
-    if (type === 'node') {
-      portGroup.classList.remove('hidden');
-      docRootGroup.classList.add('hidden');
-      document.getElementById('port')?.setAttribute('required', 'required');
-      document.getElementById('documentRoot')?.removeAttribute('required');
-    } else {
-      portGroup.classList.add('hidden');
-      docRootGroup.classList.remove('hidden');
-      document.getElementById('port')?.removeAttribute('required');
-      document.getElementById('documentRoot')?.setAttribute('required', 'required');
-    }
-  });
 }
 
+/**
+ * Handler para clique no backdrop do modal
+ */
+function handleModalBackdropClick(e: Event) {
+  if ((e.target as HTMLElement).id === 'modal') {
+    closeModal();
+  }
+}
+
+/**
+ * Handler para mudança no tipo de domínio (Node/Static)
+ */
+function handleTypeChange(e: Event) {
+  const type = (e.target as HTMLSelectElement).value;
+  toggleFormFields(type === 'node');
+}
+
+/**
+ * Toggle campos do formulário baseado no tipo
+ */
+function toggleFormFields(isNode: boolean) {
+  const portGroup = document.getElementById('port-group')!;
+  const docRootGroup = document.getElementById('documentRoot-group')!;
+  const portInput = document.getElementById('port');
+  const docRootInput = document.getElementById('documentRoot');
+
+  if (isNode) {
+    portGroup.classList.remove('hidden');
+    docRootGroup.classList.add('hidden');
+    portInput?.setAttribute('required', 'required');
+    docRootInput?.removeAttribute('required');
+  } else {
+    portGroup.classList.add('hidden');
+    docRootGroup.classList.remove('hidden');
+    portInput?.removeAttribute('required');
+    docRootInput?.setAttribute('required', 'required');
+  }
+}
+
+/**
+ * Mapa de ações de domínio
+ */
+const DOMAIN_ACTIONS = {
+  'edit': async (domain: string) => {
+    openEditModal(domain);
+  },
+  'delete': async (domain: string) => {
+    await deleteDomain(domain);
+    await loadDomains();
+  },
+  'obtain-ssl': async (domain: string) => {
+    await obtainSSL(domain);
+    await loadDomains();
+    alert('SSL obtido com sucesso!');
+  },
+  'renew-ssl': async (domain: string) => {
+    await renewSSL(domain);
+    await loadDomains();
+    alert('SSL renovado com sucesso!');
+  }
+} as const;
+
+/**
+ * Handler para ações em domínios (editar, remover, SSL)
+ */
 async function handleDomainAction(e: Event) {
   const btn = e.target as HTMLButtonElement;
-  const action = btn.dataset.action;
+  const action = btn.dataset.action as keyof typeof DOMAIN_ACTIONS;
   const domain = btn.dataset.domain!;
 
   if (!confirm(`Confirma ação: ${action} em ${domain}?`)) {
     return;
   }
 
-  try {
-    btn.disabled = true;
-    btn.textContent = 'Processando...';
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Processando...';
 
-    switch (action) {
-      case 'edit':
-        openEditModal(domain);
-        break;
-      case 'delete':
-        await deleteDomain(domain);
-        await loadDomains();
-        break;
-      case 'obtain-ssl':
-        await obtainSSL(domain);
-        await loadDomains();
-        alert('SSL obtido com sucesso!');
-        break;
-      case 'renew-ssl':
-        await renewSSL(domain);
-        await loadDomains();
-        alert('SSL renovado com sucesso!');
-        break;
-    }
+  try {
+    await DOMAIN_ACTIONS[action](domain);
   } catch (err: any) {
     alert(`Erro: ${err.message}`);
   } finally {
     btn.disabled = false;
+    btn.textContent = originalText;
     render();
   }
 }
 
+/**
+ * Handler para submit do formulário
+ */
 async function handleFormSubmit(e: Event) {
   e.preventDefault();
 
@@ -319,22 +164,10 @@ async function handleFormSubmit(e: Event) {
   const formData = new FormData(form);
 
   try {
-    if (modalMode === 'add') {
-      const dto: CreateDomainDto = {
-        serverName: formData.get('serverName') as string,
-        type: formData.get('type') as 'node' | 'static',
-        port: formData.get('port') ? parseInt(formData.get('port') as string) : undefined,
-        documentRoot: formData.get('documentRoot') as string || undefined,
-      };
-
-      await addDomain(dto);
+    if (state.modal.mode === 'add') {
+      await handleAddDomain(formData);
     } else {
-      const dto = {
-        port: formData.get('port') ? parseInt(formData.get('port') as string) : undefined,
-        documentRoot: formData.get('documentRoot') as string || undefined,
-      };
-
-      await updateDomain(editingVHost!.serverName, dto);
+      await handleUpdateDomain(formData);
     }
 
     closeModal();
@@ -345,70 +178,121 @@ async function handleFormSubmit(e: Event) {
   }
 }
 
+/**
+ * Handler para adicionar domínio
+ */
+async function handleAddDomain(formData: FormData) {
+  const dto: CreateDomainDto = {
+    serverName: formData.get('serverName') as string,
+    type: formData.get('type') as 'node' | 'static',
+    port: formData.get('port') ? parseInt(formData.get('port') as string) : undefined,
+    documentRoot: formData.get('documentRoot') as string || undefined,
+  };
+
+  await addDomain(dto);
+}
+
+/**
+ * Handler para atualizar domínio
+ */
+async function handleUpdateDomain(formData: FormData) {
+  const dto = {
+    port: formData.get('port') ? parseInt(formData.get('port') as string) : undefined,
+    documentRoot: formData.get('documentRoot') as string || undefined,
+  };
+
+  await updateDomain(state.modal.editingVHost!.serverName, dto);
+}
+
+/**
+ * Abre modal para adicionar domínio
+ */
 function openAddModal() {
-  modalMode = 'add';
-  editingVHost = null;
-  isModalOpen = true;
+  state.modal.mode = 'add';
+  state.modal.editingVHost = null;
+  state.modal.isOpen = true;
   render();
 }
 
-function openEditModal(serverName: string) {
-  // Encontrar VirtualHost
-  for (const domain of domains) {
+/**
+ * Busca VirtualHost por serverName
+ */
+function findVirtualHost(serverName: string): VirtualHost | null {
+  for (const domain of state.domains) {
     if (domain.mainHost.serverName === serverName) {
-      editingVHost = domain.mainHost;
-      break;
+      return domain.mainHost;
     }
     const subdomain = domain.subdomains.find(s => s.serverName === serverName);
     if (subdomain) {
-      editingVHost = subdomain;
-      break;
+      return subdomain;
     }
   }
+  return null;
+}
 
-  if (!editingVHost) {
+/**
+ * Abre modal para editar domínio
+ */
+function openEditModal(serverName: string) {
+  const vhost = findVirtualHost(serverName);
+
+  if (!vhost) {
     alert('Domínio não encontrado');
     return;
   }
 
-  modalMode = 'edit';
-  isModalOpen = true;
+  state.modal.editingVHost = vhost;
+  state.modal.mode = 'edit';
+  state.modal.isOpen = true;
   render();
 }
 
+/**
+ * Fecha modal
+ */
 function closeModal() {
-  isModalOpen = false;
-  editingVHost = null;
+  state.modal.isOpen = false;
+  state.modal.editingVHost = null;
   render();
 }
 
-// ============ DATA LOADING ============
-
+/**
+ * Carrega lista de domínios da API
+ */
 async function loadDomains() {
-  isLoading = true;
-  error = null;
+  state.isLoading = true;
+  state.error = null;
   render();
 
   try {
-    domains = await getDomains();
+    state.domains = await getDomains();
   } catch (err: any) {
-    error = err.message;
+    state.error = err.message;
   } finally {
-    isLoading = false;
+    state.isLoading = false;
     render();
   }
 }
 
+/**
+ * Carrega diagnósticos do sistema
+ */
 async function loadDiagnostics() {
   try {
-    diagnostics = await getDiagnostics();
+    state.diagnostics = await getDiagnostics();
     render();
   } catch (err: any) {
     console.error('Erro ao carregar diagnóstico:', err);
   }
 }
 
-// ============ INIT ============
+/**
+ * Inicialização da aplicação
+ */
+function init() {
+  loadDomains();
+  loadDiagnostics();
+}
 
-loadDomains();
-loadDiagnostics();
+// Iniciar aplicação
+init();

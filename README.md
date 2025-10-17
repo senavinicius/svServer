@@ -112,9 +112,11 @@ Para acessar via domínio (ex: `manager.example.com`):
 ```
 src/
 ├── client/          # Frontend (TypeScript + CSS)
-│   ├── main.ts
-│   ├── api.ts
-│   └── style.css
+│   ├── main.ts      # Ponto de entrada e gerenciamento de estado
+│   ├── render.ts    # Funções de renderização de UI
+│   ├── dom.ts       # Utilitários de manipulação DOM
+│   ├── api.ts       # Cliente HTTP para comunicação com backend
+│   └── style.css    # Estilos CSS (organizado por seções)
 ├── server/          # Backend (Express)
 │   ├── index.ts     # API REST
 │   ├── parser.ts    # Parser de VirtualHost
@@ -122,6 +124,23 @@ src/
 └── shared/          # Types compartilhados
     └── types.ts
 ```
+
+### Arquitetura do Cliente
+
+O código do cliente está organizado em módulos especializados:
+
+- **main.ts**: Gerencia o estado global da aplicação e orquestra a UI
+- **render.ts**: Contém todas as funções de renderização (componentes em template strings)
+- **dom.ts**: Fornece utilitários type-safe para manipulação do DOM
+- **api.ts**: Abstrai toda comunicação HTTP com o backend
+- **style.css**: Estilos organizados em seções bem definidas:
+  - Reset e Base
+  - Layout Principal
+  - Botões
+  - Lista de Domínios
+  - Modal e Formulários
+  - Estados e Mensagens
+  - Diagnósticos e Status do Sistema
 
 ## API Endpoints
 

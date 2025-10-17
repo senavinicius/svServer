@@ -1,3 +1,62 @@
+/* ============================================
+   VARIÁVEIS CSS
+   ============================================ */
+
+:root {
+  /* Cores principais */
+  --color-primary: #667eea;
+  --color-primary-hover: #5568d3;
+  --color-secondary: #e5e5e5;
+  --color-secondary-hover: #d5d5d5;
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-success: #10b981;
+  --color-success-hover: #059669;
+
+  /* Cores de texto */
+  --color-text: #333;
+  --color-text-light: #666;
+  --color-text-lighter: #999;
+
+  /* Cores de background */
+  --color-bg: #f5f5f5;
+  --color-bg-white: white;
+  --color-bg-light: #f9fafb;
+
+  /* Cores de borda */
+  --color-border: #e5e5e5;
+  --color-border-light: #f0f0f0;
+
+  /* Status SSL */
+  --color-ssl-active: #059669;
+  --color-ssl-expiring: #f59e0b;
+  --color-ssl-error: #ef4444;
+
+  /* Espaçamentos */
+  --spacing-xs: 6px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 30px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Sombras */
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+
+  /* Transições */
+  --transition-fast: 0.2s;
+}
+
+/* ============================================
+   RESET E BASE
+   ============================================ */
+
 * {
   margin: 0;
   padding: 0;
@@ -6,29 +65,33 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #f5f5f5;
-  color: #333;
-  padding: 20px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: var(--spacing-xl);
 }
+
+/* ============================================
+   LAYOUT PRINCIPAL
+   ============================================ */
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: var(--color-bg-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
   color: white;
-  padding: 30px;
+  padding: var(--spacing-2xl);
 }
 
 .header h1 {
   font-size: 28px;
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .header p {
@@ -37,85 +100,93 @@ body {
 }
 
 .toolbar {
-  padding: 20px 30px;
-  border-bottom: 1px solid #e5e5e5;
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+/* ============================================
+   BOTÕES
+   ============================================ */
+
 .btn {
-  padding: 10px 20px;
+  padding: 10px var(--spacing-xl);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .btn-primary {
-  background: #667eea;
+  background: var(--color-primary);
   color: white;
 }
 
 .btn-primary:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
 }
 
 .btn-secondary {
-  background: #e5e5e5;
-  color: #333;
+  background: var(--color-secondary);
+  color: var(--color-text);
 }
 
 .btn-secondary:hover {
-  background: #d5d5d5;
+  background: var(--color-secondary-hover);
 }
 
 .btn-danger {
-  background: #ef4444;
+  background: var(--color-danger);
   color: white;
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: var(--color-danger-hover);
 }
 
 .btn-success {
-  background: #10b981;
+  background: var(--color-success);
   color: white;
 }
 
 .btn-success:hover {
-  background: #059669;
+  background: var(--color-success-hover);
 }
 
 .btn-small {
-  padding: 6px 12px;
+  padding: var(--spacing-xs) var(--spacing-md);
   font-size: 12px;
 }
 
+/* ============================================
+   LISTA DE DOMÍNIOS
+   ============================================ */
+
 .domains-list {
-  padding: 30px;
+  padding: var(--spacing-2xl);
 }
 
 .domain-card {
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
-  transition: box-shadow 0.2s;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  transition: box-shadow var(--transition-fast);
 }
 
 .domain-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .domain-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-md);
 }
 
 .domain-name {
@@ -123,13 +194,13 @@ body {
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-sm);
 }
 
 .domain-type {
   display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -152,50 +223,54 @@ body {
 
 .domain-info {
   display: flex;
-  gap: 20px;
-  margin-bottom: 12px;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
   font-size: 14px;
-  color: #666;
+  color: var(--color-text-light);
 }
 
 .ssl-status {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-xs);
   font-size: 13px;
 }
 
 .ssl-status.active {
-  color: #059669;
+  color: var(--color-ssl-active);
 }
 
 .ssl-status.expiring {
-  color: #f59e0b;
+  color: var(--color-ssl-expiring);
 }
 
 .ssl-status.expired,
 .ssl-status.none {
-  color: #ef4444;
+  color: var(--color-ssl-error);
 }
 
 .domain-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-sm);
   flex-wrap: wrap;
 }
 
 .subdomain {
   margin-left: 40px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border-light);
 }
 
 .subdomain-indicator {
   font-size: 20px;
-  color: #999;
-  margin-right: 8px;
+  color: var(--color-text-lighter);
+  margin-right: var(--spacing-sm);
 }
+
+/* ============================================
+   MODAL E FORMULÁRIOS
+   ============================================ */
 
 .modal {
   display: none;
@@ -215,9 +290,9 @@ body {
 }
 
 .modal-content {
-  background: white;
-  border-radius: 8px;
-  padding: 30px;
+  background: var(--color-bg-white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
   max-width: 500px;
   width: 90%;
   max-height: 90vh;
@@ -227,16 +302,16 @@ body {
 .modal-header {
   font-size: 20px;
   font-weight: 600;
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-xl);
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-lg);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: var(--spacing-xs);
   font-weight: 500;
   font-size: 14px;
 }
@@ -245,15 +320,15 @@ body {
 .form-group select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 14px;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--color-primary);
 }
 
 .modal-actions {
@@ -263,59 +338,67 @@ body {
   margin-top: 24px;
 }
 
+/* ============================================
+   ESTADOS E MENSAGENS
+   ============================================ */
+
 .loading {
   text-align: center;
   padding: 40px;
-  color: #999;
+  color: var(--color-text-lighter);
 }
 
 .error {
-  background: #fee;
-  color: #c33;
-  padding: 12px;
-  border-radius: 6px;
-  margin-bottom: 16px;
+  background: #fef2f2;
+  color: #991b1b;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+  border: 2px solid #fca5a5;
 }
 
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
-  color: #999;
+  padding: 60px var(--spacing-xl);
+  color: var(--color-text-lighter);
 }
 
 .empty-state h3 {
   font-size: 18px;
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .hidden {
   display: none !important;
 }
 
-/* Painel de Diagnóstico */
+/* ============================================
+   DIAGNÓSTICOS E STATUS DO SISTEMA
+   ============================================ */
+
 .diagnostics-panel {
-  background: #f9fafb;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 30px;
+  background: var(--color-bg-light);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin: var(--spacing-xl) var(--spacing-2xl);
 }
 
 .diagnostics-panel h3 {
-  margin-bottom: 16px;
-  color: #111827;
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text);
   font-size: 18px;
 }
 
 .diag-section {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-lg);
 }
 
 .diag-section h4 {
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -327,104 +410,74 @@ body {
 }
 
 .diag-section li {
-  padding: 6px 0;
+  padding: var(--spacing-xs) 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--color-text-light);
   font-family: 'Monaco', 'Courier New', monospace;
 }
 
 .diag-section li strong {
-  color: #374151;
+  color: var(--color-text);
 }
 
 .diag-section small {
-  color: #9ca3af;
+  color: var(--color-text-lighter);
   font-size: 12px;
 }
 
-.diag-problems {
-  background: #fef2f2;
-  border: 2px solid #fca5a5;
-  border-radius: 6px;
-  padding: 16px;
-  margin-bottom: 20px;
-}
-
-.diag-problems h4 {
-  color: #991b1b;
-  margin-bottom: 12px;
-}
-
-.diag-problems ul {
-  list-style: none;
-  padding: 0;
-}
-
-.diag-problems li {
-  padding: 8px 0;
-  color: #7f1d1d;
-  font-weight: 500;
-}
-
-.diag-success {
-  background: #f0fdf4;
-  border: 2px solid #86efac;
-  border-radius: 6px;
-  padding: 16px;
-  margin-bottom: 20px;
-  color: #166534;
-  font-weight: 600;
-}
-
-.domains-count {
-  padding: 12px 20px;
-  background: #f3f4f6;
-  border-radius: 6px;
-  margin-bottom: 16px;
-  font-size: 14px;
-}
-
-.error {
-  background: #fef2f2;
-  border: 2px solid #fca5a5;
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.error h3 {
-  color: #991b1b;
-  margin-bottom: 12px;
-}
-
-.error p {
-  color: #7f1d1d;
-  margin-bottom: 8px;
-}
-
-.error ul {
-  margin-left: 20px;
-  color: #7f1d1d;
-}
-
-.error li {
-  margin: 4px 0;
-}
-
+.diag-problems,
+.diag-success,
 .system-status {
-  margin: 20px 30px;
-  padding: 16px 20px;
-  border-radius: 8px;
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
 }
 
+.diag-problems,
 .system-status.error {
   background: #fef2f2;
   border: 2px solid #fca5a5;
   color: #7f1d1d;
 }
 
+.diag-problems h4 {
+  color: #991b1b;
+  margin-bottom: var(--spacing-md);
+}
+
+.diag-problems ul,
+.diag-success ul {
+  list-style: none;
+  padding: 0;
+}
+
+.diag-problems li {
+  padding: var(--spacing-sm) 0;
+  font-weight: 500;
+}
+
+.diag-success {
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  color: #166534;
+  font-weight: 600;
+}
+
+.domains-count {
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: var(--color-bg-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+  font-size: 14px;
+}
+
+.system-status {
+  margin: var(--spacing-xl) var(--spacing-2xl);
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .system-status div {
-  margin: 4px 0;
+  margin: var(--spacing-xs) 0;
 }
