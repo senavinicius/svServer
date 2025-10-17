@@ -1,11 +1,13 @@
 import './style.css';
-import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL } from './api.js';
+import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDto } from '../shared/types.js';
 
 // ============ STATE ============
 let domains: Domain[] = [];
 let isLoading = false;
 let error: string | null = null;
+let diagnostics: any = null;
+let showDiagnostics = false;
 
 // ============ MODAL STATE ============
 let isModalOpen = false;
@@ -165,6 +167,61 @@ function renderModal(): string {
   `;
 }
 
+function renderDiagnostics(): string {
+  if (!showDiagnostics || !diagnostics) {
+    return '';
+  }
+
+  const { server, apache, ssl } = diagnostics;
+
+  return `
+    <div class="diagnostics-panel">
+      <h3>🔍 Diagnóstico do Sistema</h3>
+
+      <div class="diag-section">
+        <h4>Servidor</h4>
+        <ul>
+          <li><strong>Plataforma:</strong> ${server.platform}</li>
+          <li><strong>Node.js:</strong> ${server.nodeVersion}</li>
+          <li><strong>PID:</strong> ${server.pid}</li>
+          <li><strong>Uptime:</strong> ${Math.floor(server.uptime)}s</li>
+        </ul>
+      </div>
+
+      <div class="diag-section">
+        <h4>Arquivos de Configuração Apache</h4>
+        <ul>
+          <li>
+            <strong>HTTP Config:</strong>
+            ${apache.httpConfigExists ? '✅' : '❌'}
+            ${apache.httpConfigPath}
+          </li>
+          <li>
+            <strong>HTTPS Config:</strong>
+            ${apache.httpsConfigExists ? '✅' : '❌'}
+            ${apache.httpsConfigPath}
+          </li>
+        </ul>
+      </div>
+
+      <div class="diag-section">
+        <h4>SSL / Let's Encrypt</h4>
+        <ul>
+          <li>
+            <strong>Diretório de Renovação:</strong>
+            ${ssl.renewalDirExists ? '✅' : '❌'}
+            ${ssl.renewalDirPath}
+          </li>
+        </ul>
+      </div>
+
+      <div class="diag-section">
+        <small>Atualizado em: ${new Date(diagnostics.timestamp).toLocaleString('pt-BR')}</small>
+      </div>
+    </div>
+  `;
+}
+
 function render() {
   const app = document.getElementById('app')!;
 
@@ -176,9 +233,13 @@ function render() {
       </div>
 
       <div class="toolbar">
-        <div></div>
+        <button class="btn btn-secondary" id="toggle-diagnostics-btn">
+          ${showDiagnostics ? '🔽 Esconder' : '🔍 Diagnóstico'}
+        </button>
         <button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
       </div>
+
+      ${renderDiagnostics()}
 
       <div class="domains-list">
         ${renderDomainsList()}
@@ -196,6 +257,15 @@ function render() {
 function attachEventListeners() {
   // Botão adicionar domínio
   document.getElementById('add-domain-btn')?.addEventListener('click', openAddModal);
+
+  // Botão toggle diagnóstico
+  document.getElementById('toggle-diagnostics-btn')?.addEventListener('click', async () => {
+    showDiagnostics = !showDiagnostics;
+    if (showDiagnostics && !diagnostics) {
+      await loadDiagnostics();
+    }
+    render();
+  });
 
   // Ações dos domínios
   document.querySelectorAll('[data-action]').forEach(btn => {
@@ -360,6 +430,16 @@ async function loadDomains() {
   }
 }
 
+async function loadDiagnostics() {
+  try {
+    diagnostics = await getDiagnostics();
+    render();
+  } catch (err: any) {
+    console.error('Erro ao carregar diagnóstico:', err);
+  }
+}
+
 // ============ INIT ============
 
 loadDomains();
+loadDiagnostics();

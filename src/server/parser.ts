@@ -169,11 +169,6 @@ export async function loadSSLInfo(): Promise<Map<string, SSLInfo>> {
  * Combina VirtualHosts HTTP e HTTPS, aplicando informações SSL
  */
 export async function getAllVirtualHosts(): Promise<VirtualHost[]> {
-  // Verificar se os arquivos existem
-  if (!existsSync(VHOST_HTTP_PATH) && !existsSync(VHOST_HTTPS_PATH)) {
-    throw new Error(`Arquivos de configuração do Apache não encontrados. Procurado em: ${VHOST_HTTP_PATH} e ${VHOST_HTTPS_PATH}`);
-  }
-
   const httpVhosts = parseApacheConfig(VHOST_HTTP_PATH);
   const httpsVhosts = parseApacheConfig(VHOST_HTTPS_PATH);
   const sslInfo = await loadSSLInfo();

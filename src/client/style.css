@@ -291,3 +291,53 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* Painel de Diagnóstico */
+.diagnostics-panel {
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 30px;
+}
+
+.diagnostics-panel h3 {
+  margin-bottom: 16px;
+  color: #111827;
+  font-size: 18px;
+}
+
+.diag-section {
+  margin-bottom: 16px;
+}
+
+.diag-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diag-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.diag-section li {
+  padding: 6px 0;
+  font-size: 14px;
+  color: #6b7280;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.diag-section li strong {
+  color: #374151;
+}
+
+.diag-section small {
+  color: #9ca3af;
+  font-size: 12px;
+}

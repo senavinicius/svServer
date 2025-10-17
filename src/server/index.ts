@@ -60,6 +60,44 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
 // ============ ROTAS DA API ============
 
 /**
+ * GET /api/diagnostics - Retorna informações de diagnóstico do sistema
+ */
+app.get('/api/diagnostics', (_req, res) => {
+  const { existsSync } = require('fs');
+
+  const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
+  const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
+  const sslDirExists = existsSync('/etc/letsencrypt/renewal');
+
+  const diagnostics = {
+    server: {
+      platform: process.platform,
+      nodeVersion: process.version,
+      pid: process.pid,
+      uptime: process.uptime(),
+    },
+    apache: {
+      httpConfigExists: httpExists,
+      httpConfigPath: '/etc/httpd/conf.d/vhost.conf',
+      httpsConfigExists: httpsExists,
+      httpsConfigPath: '/etc/httpd/conf.d/vhost-le-ssl.conf',
+    },
+    ssl: {
+      renewalDirExists: sslDirExists,
+      renewalDirPath: '/etc/letsencrypt/renewal',
+    },
+    timestamp: new Date().toISOString(),
+  };
+
+  const response: ApiResponse<typeof diagnostics> = {
+    success: true,
+    data: diagnostics,
+  };
+
+  res.json(response);
+});
+
+/**
  * GET /api/domains - Lista todos os domínios
  */
 app.get('/api/domains', async (_req, res) => {

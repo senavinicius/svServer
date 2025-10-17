@@ -85,3 +85,10 @@ export async function renewSSL(domain: string): Promise<void> {
     body: JSON.stringify({ domain }),
   });
 }
+
+/**
+ * Obtém informações de diagnóstico do sistema
+ */
+export async function getDiagnostics(): Promise<any> {
+  return apiFetch<any>('/api/diagnostics');
+}
