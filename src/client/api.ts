@@ -1,6 +1,7 @@
 import type { Domain, CreateDomainDto, UpdateDomainDto, ApiResponse, VirtualHost } from '../shared/types.js';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3100';
+// Usar URL relativa quando em produção (mesma origem do frontend)
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Fetch wrapper com tratamento de erros
