@@ -34,7 +34,10 @@ function render() {
       ${renderSystemStatus(state.diagnostics)}
 
       <div class="toolbar">
-        <div></div>
+        <div class="toolbar-left">
+          <button class="btn btn-secondary btn-small" id="download-http-btn">⬇ HTTP Config</button>
+          <button class="btn btn-secondary btn-small" id="download-https-btn">⬇ HTTPS Config</button>
+        </div>
         <button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
       </div>
 
@@ -58,6 +61,8 @@ function attachEventListeners() {
   document.getElementById('modal')?.addEventListener('click', handleModalBackdropClick);
   document.getElementById('domain-form')?.addEventListener('submit', handleFormSubmit);
   document.getElementById('type')?.addEventListener('change', handleTypeChange);
+  document.getElementById('download-http-btn')?.addEventListener('click', () => downloadConfig('http'));
+  document.getElementById('download-https-btn')?.addEventListener('click', () => downloadConfig('https'));
 
   // Ações dos domínios (delegação de eventos)
   document.querySelectorAll('[data-action]').forEach(btn => {
@@ -284,6 +289,14 @@ async function loadDiagnostics() {
   } catch (err: any) {
     console.error('Erro ao carregar diagnóstico:', err);
   }
+}
+
+/**
+ * Download de arquivo de configuração
+ */
+function downloadConfig(type: 'http' | 'https') {
+  const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
+  window.location.href = `${baseUrl}/api/config/download/${type}`;
 }
 
 /**

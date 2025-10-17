@@ -1,5 +1,5 @@
 import express from 'express';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL } from './manager.js';
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
@@ -271,6 +271,43 @@ app.post('/api/ssl/renew', async (req, res) => {
       error: error.message,
     };
     res.status(400).json(response);
+  }
+});
+
+/**
+ * GET /api/config/download/:type - Download de arquivos de configuração
+ */
+app.get('/api/config/download/:type', (req, res) => {
+  try {
+    const { type } = req.params;
+
+    let filePath: string;
+    let fileName: string;
+
+    switch (type) {
+      case 'http':
+        filePath = '/etc/httpd/conf.d/vhost.conf';
+        fileName = 'vhost.conf';
+        break;
+      case 'https':
+        filePath = '/etc/httpd/conf.d/vhost-le-ssl.conf';
+        fileName = 'vhost-le-ssl.conf';
+        break;
+      default:
+        return res.status(400).json({ success: false, error: 'Tipo inválido' });
+    }
+
+    if (!existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Arquivo não encontrado' });
+    }
+
+    const content = readFileSync(filePath, 'utf-8');
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(content);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

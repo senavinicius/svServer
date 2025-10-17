@@ -107,6 +107,11 @@ body {
   align-items: center;
 }
 
+.toolbar-left {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
 /* ============================================
    BOTÕES
    ============================================ */
