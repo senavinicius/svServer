@@ -89,7 +89,23 @@ export const MOCK_VHOSTS: VirtualHost[] = [
  * Detecta se estamos em ambiente de desenvolvimento (não é Linux)
  */
 export function isDevelopmentMode(): boolean {
-  return process.platform !== 'linux' || process.env.MOCK_MODE === 'true';
+  const isDev = process.platform !== 'linux' || process.env.MOCK_MODE === 'true';
+
+  // Log detalhado na primeira vez
+  if (isDev && !global.__DEV_MODE_LOGGED__) {
+    console.log('');
+    console.log('⚠️  DEVELOPMENT/TEST MODE ACTIVE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`🖥️  Platform: ${process.platform}`);
+    console.log(`🔧 MOCK_MODE env: ${process.env.MOCK_MODE || 'not set'}`);
+    console.log('📝 Using mock data instead of real Apache configuration');
+    console.log('💡 To disable: Run on Linux server without MOCK_MODE variable');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('');
+    (global as any).__DEV_MODE_LOGGED__ = true;
+  }
+
+  return isDev;
 }
 
 /**
