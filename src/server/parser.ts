@@ -18,7 +18,7 @@ interface ParsedVHostBlock {
 
 /**
  * Parseia um arquivo de configuração do Apache e extrai todos os VirtualHosts
- * Expande cada bloco em múltiplos VirtualHosts (ServerName + cada alias)
+ * Cada bloco <VirtualHost> gera UM único VirtualHost (não expande aliases)
  */
 export function parseApacheConfig(configPath: string): VirtualHost[] {
   if (!existsSync(configPath)) {
@@ -40,18 +40,10 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
       continue;
     }
 
-    // Criar VirtualHost para o ServerName (principal)
-    const mainVhost = createVirtualHost(block, block.serverName, true);
-    if (mainVhost) {
-      vhosts.push(mainVhost);
-    }
-
-    // Criar VirtualHost para cada ServerAlias
-    for (const alias of block.serverAliases) {
-      const aliasVhost = createVirtualHost(block, alias, false);
-      if (aliasVhost) {
-        vhosts.push(aliasVhost);
-      }
+    // Cria um único VirtualHost por bloco
+    const vhost = createVirtualHost(block);
+    if (vhost) {
+      vhosts.push(vhost);
     }
   }
 
@@ -214,12 +206,9 @@ function extractDomains(directives: Map<string, string[]>): {
 
 /**
  * Cria um VirtualHost a partir de um bloco parseado
- * @param block - Bloco parseado
- * @param domainName - Nome do domínio (pode ser ServerName ou um alias)
- * @param isPrimary - true se é o ServerName, false se é um alias
  */
-function createVirtualHost(block: ParsedVHostBlock, domainName: string, isPrimary: boolean): VirtualHost | null {
-  const { serverName, directives, rawConfig } = block;
+function createVirtualHost(block: ParsedVHostBlock): VirtualHost | null {
+  const { serverName, serverAliases, directives, rawConfig } = block;
 
   const type = detectDomainType(directives);
   const port = extractProxyPort(directives);
@@ -228,10 +217,10 @@ function createVirtualHost(block: ParsedVHostBlock, domainName: string, isPrimar
   const customLog = getFirstDirective(directives, 'customlog');
   const accessLog = customLog ? customLog.split(/\s+/)[0] : undefined;
 
-  const { isSubdomain, parentDomain } = analyzeServerName(domainName);
+  const { isSubdomain, parentDomain } = analyzeServerName(serverName);
 
-  // ID único baseado no nome do domínio
-  const id = createHash('md5').update(domainName).digest('hex').substring(0, 8);
+  // ID único baseado no ServerName
+  const id = createHash('md5').update(serverName).digest('hex').substring(0, 8);
 
   // Detecta SSL no próprio bloco (certificados manuais ou Let's Encrypt)
   const hasSSL = directives.has('sslengine') ||
@@ -243,9 +232,8 @@ function createVirtualHost(block: ParsedVHostBlock, domainName: string, isPrimar
 
   return {
     id,
-    serverName: domainName,
-    isAlias: !isPrimary,
-    primaryServerName: isPrimary ? undefined : serverName,
+    serverName,
+    serverAliases: serverAliases.length > 0 ? serverAliases : undefined,
     type,
     port,
     documentRoot,
