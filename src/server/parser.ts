@@ -19,7 +19,7 @@ interface ParsedVHostBlock {
 /**
  * Parseia um arquivo de configuração do Apache e extrai todos os VirtualHosts
  * Cada bloco <VirtualHost> gera UM único VirtualHost (não expande aliases)
- * Classificação de subdomínios é feita DEPOIS, baseado em existência real
+ * NOTA: Classificação de subdomínios NÃO é feita aqui, mas depois de juntar HTTP + HTTPS
  */
 export function parseApacheConfig(configPath: string): VirtualHost[] {
   if (!existsSync(configPath)) {
@@ -30,7 +30,7 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
   const blocks = extractVirtualHostBlocks(content);
   const vhosts: VirtualHost[] = [];
 
-  // Passo 1: Criar VirtualHosts "crus" sem classificação de subdomínio
+  // Criar VirtualHosts "crus" sem classificação de subdomínio
   for (const block of blocks) {
     // Se não há ServerName, pula
     if (!block.serverName) {
@@ -47,9 +47,6 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
       vhosts.push(vhost);
     }
   }
-
-  // Passo 2: Classificar subdomínios baseado em existência real
-  classifySubdomains(vhosts);
 
   return vhosts;
 }
@@ -210,8 +207,9 @@ function extractDomains(directives: Map<string, string[]>): {
 
 /**
  * Classifica VirtualHosts como subdomínios baseado em existência real do domínio pai
+ * DEVE ser chamado APÓS juntar VirtualHosts de HTTP e HTTPS
  */
-function classifySubdomains(vhosts: VirtualHost[]): void {
+export function classifySubdomains(vhosts: VirtualHost[]): void {
   // Criar set com todos os serverNames que existem
   const existingDomains = new Set(vhosts.map(v => v.serverName));
 
@@ -383,6 +381,7 @@ export async function loadSSLInfo(): Promise<Map<string, SSLInfo>> {
 
 /**
  * Combina VirtualHosts HTTP e HTTPS, aplicando informações SSL
+ * Classifica subdomínios APÓS juntar os 2 arquivos
  */
 export async function getAllVirtualHosts(): Promise<VirtualHost[]> {
   const httpVhosts = parseApacheConfig(VHOST_HTTP_PATH);
@@ -410,5 +409,10 @@ export async function getAllVirtualHosts(): Promise<VirtualHost[]> {
     }
   }
 
-  return Array.from(vhostMap.values());
+  const allVhosts = Array.from(vhostMap.values());
+
+  // IMPORTANTE: Classificar subdomínios APÓS juntar HTTP + HTTPS
+  classifySubdomains(allVhosts);
+
+  return allVhosts;
 }
