@@ -20,17 +20,46 @@ const SSL_STATUS_CONFIG = {
 } as const;
 
 /**
+ * Formata data ISO para exibição legível
+ */
+function formatExpiryDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Renderiza o status SSL de um VirtualHost
  */
 export function renderSSLStatus(vhost: VirtualHost): string {
   const ssl = vhost.ssl;
   const config = SSL_STATUS_CONFIG[ssl.status];
 
+  // Se não tem SSL
+  if (ssl.status === 'none') {
+    return `<span class="ssl-status ${config.class}">${config.icon} ${config.text}</span>`;
+  }
+
+  // Para outros status, se não tiver dias válidos, mostra "Ativo" ou "Expirado"
+  const days = ssl.daysUntilExpiry;
+  if (days === undefined || days === null) {
+    const fallbackText = ssl.status === 'expired' ? 'Expirado' : 'Ativo';
+    return `<span class="ssl-status ${config.class}">${config.icon} ${fallbackText}</span>`;
+  }
+
+  // Texto principal (dias)
   const text = typeof config.text === 'function'
-    ? config.text(ssl.daysUntilExpiry || 0)
+    ? config.text(days)
     : config.text;
 
-  return `<span class="ssl-status ${config.class}">${config.icon} ${text}</span>`;
+  // Tooltip com data de expiração (se disponível)
+  const tooltip = ssl.expiresAt
+    ? `title="Expira em: ${formatExpiryDate(ssl.expiresAt)}"`
+    : '';
+
+  return `<span class="ssl-status ${config.class}" ${tooltip}>${config.icon} ${text}</span>`;
 }
 
 /**

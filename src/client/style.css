@@ -278,6 +278,8 @@ body {
   gap: 3px;
   font-size: 11px;
   font-weight: 500;
+  cursor: help;
+  position: relative;
 }
 
 .ssl-status.active {
@@ -291,6 +293,36 @@ body {
 .ssl-status.expired,
 .ssl-status.none {
   color: var(--color-ssl-error);
+}
+
+.ssl-status[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 100;
+  margin-bottom: 6px;
+  pointer-events: none;
+}
+
+.ssl-status[title]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+  margin-bottom: 1px;
+  z-index: 100;
+  pointer-events: none;
 }
 
 /* Subdomínios */
