@@ -50,41 +50,34 @@ app.use((_req, res, next) => {
 
 /**
  * Agrupa VirtualHosts em domínios principais e subdomínios
+ * Com a nova lógica, apenas subdomínios com pais EXISTENTES têm isSubdomain=true
  */
 function groupDomains(vhosts: VirtualHost[]): Domain[] {
   const domainsMap = new Map<string, Domain>();
 
+  // Primeiro, criar todos os domínios principais
+  for (const vhost of vhosts) {
+    if (!vhost.isSubdomain) {
+      domainsMap.set(vhost.serverName, {
+        name: vhost.serverName,
+        type: vhost.type,
+        mainHost: vhost,
+        subdomains: [],
+      });
+    }
+  }
+
+  // Depois, adicionar subdomínios aos seus pais
   for (const vhost of vhosts) {
     if (vhost.isSubdomain && vhost.parentDomain) {
-      // É um subdomínio
-      if (!domainsMap.has(vhost.parentDomain)) {
-        // Criar domínio pai placeholder se não existir
-        domainsMap.set(vhost.parentDomain, {
-          name: vhost.parentDomain,
-          type: 'node',
-          mainHost: vhost, // temporário
-          subdomains: [],
-        });
-      }
-      const domain = domainsMap.get(vhost.parentDomain)!;
-      domain.subdomains.push(vhost);
-    } else {
-      // É um domínio principal
-      if (!domainsMap.has(vhost.serverName)) {
-        domainsMap.set(vhost.serverName, {
-          name: vhost.serverName,
-          type: vhost.type,
-          mainHost: vhost,
-          subdomains: [],
-        });
+      const parentDomain = domainsMap.get(vhost.parentDomain);
+      if (parentDomain) {
+        parentDomain.subdomains.push(vhost);
       }
     }
   }
 
-  // Remover domínios placeholder (que não têm mainHost real)
-  const domains = Array.from(domainsMap.values()).filter(d => !d.mainHost.isSubdomain);
-
-  return domains;
+  return Array.from(domainsMap.values());
 }
 
 // ============ ROTAS DA API ============

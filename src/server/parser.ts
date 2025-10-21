@@ -19,6 +19,7 @@ interface ParsedVHostBlock {
 /**
  * Parseia um arquivo de configuração do Apache e extrai todos os VirtualHosts
  * Cada bloco <VirtualHost> gera UM único VirtualHost (não expande aliases)
+ * Classificação de subdomínios é feita DEPOIS, baseado em existência real
  */
 export function parseApacheConfig(configPath: string): VirtualHost[] {
   if (!existsSync(configPath)) {
@@ -29,6 +30,7 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
   const blocks = extractVirtualHostBlocks(content);
   const vhosts: VirtualHost[] = [];
 
+  // Passo 1: Criar VirtualHosts "crus" sem classificação de subdomínio
   for (const block of blocks) {
     // Se não há ServerName, pula
     if (!block.serverName) {
@@ -40,12 +42,14 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
       continue;
     }
 
-    // Cria um único VirtualHost por bloco
     const vhost = createVirtualHost(block);
     if (vhost) {
       vhosts.push(vhost);
     }
   }
+
+  // Passo 2: Classificar subdomínios baseado em existência real
+  classifySubdomains(vhosts);
 
   return vhosts;
 }
@@ -205,7 +209,39 @@ function extractDomains(directives: Map<string, string[]>): {
 }
 
 /**
- * Cria um VirtualHost a partir de um bloco parseado
+ * Classifica VirtualHosts como subdomínios baseado em existência real do domínio pai
+ */
+function classifySubdomains(vhosts: VirtualHost[]): void {
+  // Criar set com todos os serverNames que existem
+  const existingDomains = new Set(vhosts.map(v => v.serverName));
+
+  for (const vhost of vhosts) {
+    const parts = vhost.serverName.split('.');
+
+    // Se tem mais de 2 partes, pode ser subdomínio
+    if (parts.length > 2) {
+      // Extrair domínio pai (últimas 2 partes)
+      const parentDomain = parts.slice(-2).join('.');
+
+      // Verificar se o domínio pai EXISTE no arquivo
+      if (existingDomains.has(parentDomain)) {
+        vhost.isSubdomain = true;
+        vhost.parentDomain = parentDomain;
+      } else {
+        // Pai não existe, tratar como domínio principal
+        vhost.isSubdomain = false;
+        vhost.parentDomain = undefined;
+      }
+    } else {
+      // Domínio de 2 partes, sempre principal
+      vhost.isSubdomain = false;
+      vhost.parentDomain = undefined;
+    }
+  }
+}
+
+/**
+ * Cria um VirtualHost a partir de um bloco parseado (sem classificar subdomínio ainda)
  */
 function createVirtualHost(block: ParsedVHostBlock): VirtualHost | null {
   const { serverName, serverAliases, directives, rawConfig } = block;
@@ -216,8 +252,6 @@ function createVirtualHost(block: ParsedVHostBlock): VirtualHost | null {
   const errorLog = getFirstDirective(directives, 'errorlog');
   const customLog = getFirstDirective(directives, 'customlog');
   const accessLog = customLog ? customLog.split(/\s+/)[0] : undefined;
-
-  const { isSubdomain, parentDomain } = analyzeServerName(serverName);
 
   // ID único baseado no ServerName
   const id = createHash('md5').update(serverName).digest('hex').substring(0, 8);
@@ -239,8 +273,8 @@ function createVirtualHost(block: ParsedVHostBlock): VirtualHost | null {
     documentRoot,
     errorLog,
     accessLog,
-    isSubdomain,
-    parentDomain,
+    isSubdomain: false, // Será classificado depois
+    parentDomain: undefined, // Será definido depois
     ssl: sslEnabled ? { enabled: true, status: 'active' } : { enabled: false, status: 'none' },
     rawConfig,
   };
@@ -301,21 +335,6 @@ function extractProxyPort(directives: Map<string, string[]>): number | undefined
   }
 
   return undefined;
-}
-
-/**
- * Analisa se é subdomínio e qual é o domínio pai
- */
-function analyzeServerName(serverName: string): { isSubdomain: boolean; parentDomain?: string } {
-  const parts = serverName.split('.');
-
-  if (parts.length > 2) {
-    // É um subdomínio (ex: api.example.com)
-    const parentDomain = parts.slice(-2).join('.');
-    return { isSubdomain: true, parentDomain };
-  }
-
-  return { isSubdomain: false };
 }
 
 /**
