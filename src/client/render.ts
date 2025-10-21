@@ -14,9 +14,9 @@ const TYPE_CONFIG = {
  */
 const SSL_STATUS_CONFIG = {
   none: { icon: '❌', text: 'Sem SSL', class: 'none' },
-  expired: { icon: '❌', text: 'Expirado', class: 'expired' },
-  expiring: { icon: '⚠️', text: (days: number) => `Expira em ${days} dias`, class: 'expiring' },
-  active: { icon: '✅', text: (days: number) => `SSL Ativo (${days} dias)`, class: 'active' }
+  expired: { icon: '❌', text: () => `Expirado`, class: 'expired' },
+  expiring: { icon: '⚠️', text: (days: number) => `${days}d`, class: 'expiring' },
+  active: { icon: '✅', text: (days: number) => `${days}d`, class: 'active' }
 } as const;
 
 /**
@@ -66,7 +66,7 @@ function renderButton(action: string, domain: string, label: string, variant: st
 }
 
 /**
- * Renderiza um VirtualHost individual
+ * Renderiza um VirtualHost individual em formato de linha (estilo planilha)
  */
 export function renderVirtualHost(vhost: VirtualHost, isSubdomain = false): string {
   const { icon, label } = TYPE_CONFIG[vhost.type];
@@ -75,19 +75,16 @@ export function renderVirtualHost(vhost: VirtualHost, isSubdomain = false): stri
   const subdoIndicator = isSubdomain ? '<span class="subdomain-indicator">↳</span>' : '';
 
   return `
-    <div class="${subdoClass}">
-      <div class="domain-header">
-        <div class="domain-name">
-          ${subdoIndicator}
-          ${icon} ${vhost.serverName}
-          <span class="domain-type ${vhost.type}">${label}</span>
-        </div>
+    <div class="vhost-row ${subdoClass}">
+      <div class="vhost-cell vhost-name">
+        ${subdoIndicator}<span class="vhost-icon">${icon}</span>${vhost.serverName}
       </div>
-      <div class="domain-info">
-        <span><strong>Target:</strong> ${target}</span>
-        ${renderSSLStatus(vhost)}
+      <div class="vhost-cell vhost-type">
+        <span class="domain-type ${vhost.type}">${label}</span>
       </div>
-      <div class="domain-actions">
+      <div class="vhost-cell vhost-target">${target}</div>
+      <div class="vhost-cell vhost-ssl">${renderSSLStatus(vhost)}</div>
+      <div class="vhost-cell vhost-actions">
         ${renderVirtualHostActions(vhost)}
       </div>
     </div>

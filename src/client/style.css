@@ -168,47 +168,92 @@ body {
 }
 
 /* ============================================
-   LISTA DE DOMÍNIOS
+   LISTA DE DOMÍNIOS - ESTILO PLANILHA
    ============================================ */
 
 .domains-list {
-  padding: var(--spacing-2xl);
+  padding: var(--spacing-xl);
 }
 
 .domain-card {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-lg);
-  transition: box-shadow var(--transition-fast);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  overflow: hidden;
+  background: var(--color-bg-white);
 }
 
 .domain-card:hover {
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
-.domain-header {
-  display: flex;
-  justify-content: space-between;
+/* Layout de linha tipo planilha */
+.vhost-row {
+  display: grid;
+  grid-template-columns: 2fr 0.6fr 1.5fr 0.8fr 1.5fr;
+  gap: var(--spacing-md);
   align-items: center;
-  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
+  font-size: 13px;
+  transition: background-color var(--transition-fast);
 }
 
-.domain-name {
-  font-size: 18px;
-  font-weight: 600;
+.vhost-row:last-child {
+  border-bottom: none;
+}
+
+.vhost-row:hover {
+  background: var(--color-bg-light);
+}
+
+/* Células da planilha */
+.vhost-cell {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
 }
 
+.vhost-name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.vhost-icon {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+.vhost-type {
+  justify-content: center;
+}
+
+.vhost-target {
+  color: var(--color-text-light);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vhost-ssl {
+  font-size: 12px;
+}
+
+.vhost-actions {
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Tipo de domínio (badge) */
 .domain-type {
   display: inline-block;
-  padding: var(--spacing-xs) var(--spacing-sm);
+  padding: 2px 6px;
   border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .domain-type.node {
@@ -226,19 +271,13 @@ body {
   color: #5b21b6;
 }
 
-.domain-info {
-  display: flex;
-  gap: var(--spacing-xl);
-  margin-bottom: var(--spacing-md);
-  font-size: 14px;
-  color: var(--color-text-light);
-}
-
+/* Status SSL */
 .ssl-status {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font-size: 13px;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .ssl-status.active {
@@ -254,23 +293,16 @@ body {
   color: var(--color-ssl-error);
 }
 
-.domain-actions {
-  display: flex;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
+/* Subdomínios */
 .subdomain {
-  margin-left: 40px;
-  margin-top: var(--spacing-md);
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-border-light);
+  background: #fafafa;
+  padding-left: var(--spacing-lg);
 }
 
 .subdomain-indicator {
-  font-size: 20px;
+  font-size: 14px;
   color: var(--color-text-lighter);
-  margin-right: var(--spacing-sm);
+  margin-right: 2px;
 }
 
 /* ============================================
