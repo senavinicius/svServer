@@ -12,7 +12,8 @@ export interface SSLInfo {
 export interface VirtualHost {
   id: string; // hash do ServerName
   serverName: string;
-  serverAliases?: string[]; // Aliases do ServerName
+  isAlias: boolean; // true se este VirtualHost representa um ServerAlias
+  primaryServerName?: string; // ServerName principal (se isAlias=true)
   type: DomainType;
   port?: number; // para tipo 'node'
   documentRoot?: string; // para tipo 'static' ou 'php'
