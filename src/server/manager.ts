@@ -91,6 +91,29 @@ function escapeShellArg(arg: string): string {
 }
 
 /**
+ * Escreve conteúdo em arquivo protegido usando sudo
+ */
+async function writeProtectedFile(filePath: string, content: string): Promise<void> {
+  const tempPath = `/tmp/vhost-write-${Date.now()}.conf`;
+
+  // Escrever em arquivo temporário
+  writeFileSync(tempPath, content, 'utf-8');
+
+  try {
+    // Copiar para destino final com sudo
+    await execCommand(`sudo cp ${escapeShellArg(tempPath)} ${escapeShellArg(filePath)}`);
+    await execCommand(`sudo chmod 644 ${escapeShellArg(filePath)}`);
+  } finally {
+    // Limpar arquivo temporário
+    try {
+      await execCommand(`rm -f ${escapeShellArg(tempPath)}`);
+    } catch (error) {
+      console.warn('Aviso: não foi possível remover arquivo temporário:', tempPath);
+    }
+  }
+}
+
+/**
  * Gera configuração VirtualHost para domínio Node
  */
 function generateNodeVirtualHost(serverName: string, port: number): string {
@@ -171,7 +194,7 @@ export async function addDomain(dto: CreateDomainDTO): Promise<void> {
   // Adicionar ao arquivo de configuração
   const currentConfig = existsSync(VHOST_HTTP_PATH) ? readFileSync(VHOST_HTTP_PATH, 'utf-8') : '';
   const newConfig = currentConfig + '\n' + vhostConfig;
-  writeFileSync(VHOST_HTTP_PATH, newConfig, 'utf-8');
+  await writeProtectedFile(VHOST_HTTP_PATH, newConfig);
 
   // Testar configuração
   await execCommand('apachectl configtest');
@@ -197,7 +220,7 @@ export async function removeDomain(serverName: string): Promise<void> {
   const sanitizedName = serverName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   let removed = false;
 
-  const removeFromFile = (filePath: string) => {
+  const removeFromFile = async (filePath: string) => {
     if (!existsSync(filePath)) {
       return;
     }
@@ -211,13 +234,13 @@ export async function removeDomain(serverName: string): Promise<void> {
     const newContent = content.replace(vhostRegex, '');
 
     if (newContent !== content) {
-      writeFileSync(filePath, newContent, 'utf-8');
+      await writeProtectedFile(filePath, newContent);
       removed = true;
     }
   };
 
-  removeFromFile(VHOST_HTTP_PATH);
-  removeFromFile(VHOST_HTTPS_PATH);
+  await removeFromFile(VHOST_HTTP_PATH);
+  await removeFromFile(VHOST_HTTPS_PATH);
 
   if (!removed) {
     throw new Error('Domínio não encontrado');
@@ -293,7 +316,7 @@ export async function updateDomain(serverName: string, dto: UpdateDomainDto): Pr
     throw new Error('Nenhuma alteração detectada ou domínio não encontrado');
   }
 
-  writeFileSync(VHOST_HTTP_PATH, newContent, 'utf-8');
+  await writeProtectedFile(VHOST_HTTP_PATH, newContent);
 
   // Testar configuração
   await execCommand('apachectl configtest');
