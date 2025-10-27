@@ -20,7 +20,14 @@
 - **Renewal**: `/etc/letsencrypt/renewal/<domain>.conf`
 - **Comando**: `sudo certbot --apache -d <domain>`
 
-### Sudoers (já configurado)
+### Sudoers (configuração necessária)
+
+**Editar sudoers:**
+```bash
+sudo visudo
+```
+
+**Adicionar estas linhas:**
 ```
 ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl reload httpd
 ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl restart httpd
@@ -28,6 +35,15 @@ ec2-user ALL=(root) NOPASSWD: /usr/bin/certbot
 ec2-user ALL=(root) NOPASSWD: /usr/bin/ln
 ec2-user ALL=(root) NOPASSWD: /usr/bin/rm
 ec2-user ALL=(root) NOPASSWD: /usr/bin/mv
+ec2-user ALL=(root) NOPASSWD: /usr/sbin/apachectl
+ec2-user ALL=(root) NOPASSWD: /usr/bin/cp
+ec2-user ALL=(root) NOPASSWD: /usr/bin/chmod
+ec2-user ALL=(root) NOPASSWD: /usr/bin/test
+```
+
+**Verificar:**
+```bash
+sudo -l
 ```
 
 ## Permissões
