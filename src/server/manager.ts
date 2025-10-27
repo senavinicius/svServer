@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { CreateDomainDTO, UpdateDomainDto } from '../shared/types.js';
+import { logger } from './logger.js';
 
 const execAsync = promisify(exec);
 
@@ -153,57 +154,76 @@ function generateStaticVirtualHost(serverName: string, documentRoot: string): st
  * Adiciona um novo domínio ao Apache
  */
 export async function addDomain(dto: CreateDomainDTO): Promise<void> {
+  logger.info('addDomain', `Iniciando adição de domínio`, { dto });
+
   // Validar domínio
   if (!validateDomain(dto.serverName)) {
+    logger.error('addDomain', 'Domínio inválido', { serverName: dto.serverName });
     throw new Error('Domínio inválido');
   }
 
   // Validar parâmetros por tipo
   if (dto.type === 'node' && !dto.port) {
+    logger.error('addDomain', 'Porta obrigatória para domínios Node', { dto });
     throw new Error('Porta é obrigatória para domínios Node');
   }
 
   if (dto.type === 'static' && !dto.documentRoot) {
+    logger.error('addDomain', 'DocumentRoot obrigatório para domínios Static', { dto });
     throw new Error('DocumentRoot é obrigatório para domínios Static');
   }
 
   // Validar documentRoot se fornecido
   if (dto.type === 'static' && dto.documentRoot && !validateDocumentRoot(dto.documentRoot)) {
+    logger.error('addDomain', 'DocumentRoot inválido', { documentRoot: dto.documentRoot });
     throw new Error('DocumentRoot inválido: deve ser um caminho absoluto e não pode acessar diretórios sensíveis do sistema');
   }
 
   // Validar porta se fornecida
   if (dto.type === 'node' && dto.port) {
     if (dto.port < 1 || dto.port > 65535) {
+      logger.error('addDomain', 'Porta fora do range válido', { port: dto.port });
       throw new Error('Porta inválida: deve estar entre 1 e 65535');
     }
     // Portas reservadas do sistema
     if (dto.port < 1024) {
+      logger.error('addDomain', 'Porta reservada', { port: dto.port });
       throw new Error('Porta inválida: portas abaixo de 1024 são reservadas');
     }
   }
 
   // Gerar configuração
+  logger.debug('addDomain', 'Gerando configuração VirtualHost');
   let vhostConfig: string;
   if (dto.type === 'node') {
     vhostConfig = generateNodeVirtualHost(dto.serverName, dto.port!);
   } else {
     vhostConfig = generateStaticVirtualHost(dto.serverName, dto.documentRoot!);
   }
+  logger.debug('addDomain', 'Configuração gerada', { configLength: vhostConfig.length });
 
   // Adicionar ao arquivo de configuração
   const currentConfig = existsSync(VHOST_HTTP_PATH) ? readFileSync(VHOST_HTTP_PATH, 'utf-8') : '';
   const newConfig = currentConfig + '\n' + vhostConfig;
+
+  logger.fileOperation('addDomain', VHOST_HTTP_PATH, currentConfig, newConfig);
   await writeProtectedFile(VHOST_HTTP_PATH, newConfig);
+  logger.info('addDomain', 'Domínio adicionado ao arquivo de configuração');
 
   // Testar configuração
+  logger.debug('addDomain', 'Testando configuração Apache');
   await execCommand('apachectl configtest');
+  logger.info('addDomain', 'Configuração Apache válida');
 
   // Recarregar Apache
+  logger.debug('addDomain', 'Recarregando Apache');
   await execCommand('sudo systemctl reload httpd');
+  logger.info('addDomain', 'Apache recarregado');
 
   // Obter SSL automaticamente
+  logger.info('addDomain', 'Obtendo certificado SSL');
   await obtainSSL(dto.serverName);
+  logger.info('addDomain', `Domínio adicionado com sucesso: ${dto.serverName}`);
 }
 
 /**
@@ -211,8 +231,11 @@ export async function addDomain(dto: CreateDomainDTO): Promise<void> {
  * Mantém certificados emitidos; use `sudo certbot delete --cert-name <domínio>` manualmente se desejar removê-los.
  */
 export async function removeDomain(serverName: string): Promise<void> {
+  logger.info('removeDomain', `Iniciando remoção de domínio: ${serverName}`);
+
   // Validar domínio antes de processar
   if (!validateDomain(serverName)) {
+    logger.error('removeDomain', 'Domínio inválido', { serverName });
     throw new Error('Domínio inválido');
   }
 
@@ -223,21 +246,48 @@ export async function removeDomain(serverName: string): Promise<void> {
 
   const removeFromFile = async (filePath: string) => {
     if (!existsSync(filePath)) {
+      logger.debug('removeFromFile', `Arquivo não existe: ${filePath}`);
       return;
     }
 
     const content = readFileSync(filePath, 'utf-8');
+    logger.debug('removeFromFile', `Lendo arquivo: ${filePath}`, { contentLength: content.length });
+
+    // REGEX CORRIGIDA: Usar non-greedy match e garantir que ServerName é exato
+    // A regex anterior era muito gulosa e podia capturar múltiplos VirtualHosts
     const vhostRegex = new RegExp(
-      `<VirtualHost[^>]*>[\\s\\S]*?ServerName ${sanitizedName}[\\s\\S]*?<\\/VirtualHost>`,
-      'gi'
+      `<VirtualHost[^>]*>\\s*?[\\s\\S]*?ServerName\\s+${sanitizedName}(?:\\s|\\n)[\\s\\S]*?<\\/VirtualHost>\\s*?`,
+      'gm'
     );
+
+    logger.debug('removeFromFile', 'Regex pattern', { pattern: vhostRegex.source });
+
+    // Encontrar todos os matches ANTES de remover (para logging)
+    const matches = content.match(vhostRegex);
+    if (matches) {
+      logger.info('removeFromFile', `Encontrado ${matches.length} bloco(s) VirtualHost para remover`, {
+        filePath,
+        matches: matches.map(m => ({
+          preview: m.substring(0, 200) + '...',
+          length: m.length,
+        })),
+      });
+    }
 
     const newContent = content.replace(vhostRegex, '');
 
     if (newContent !== content) {
+      // Log da operação de arquivo
+      logger.fileOperation('removeFromFile', filePath, content, newContent);
+
       await writeProtectedFile(filePath, newContent);
       removed = true;
       removedFiles.push(filePath);
+      logger.info('removeFromFile', `Domínio removido de: ${filePath}`, {
+        bytesRemoved: content.length - newContent.length,
+      });
+    } else {
+      logger.warn('removeFromFile', `Domínio não encontrado em: ${filePath}`);
     }
   };
 
@@ -246,12 +296,17 @@ export async function removeDomain(serverName: string): Promise<void> {
   await removeFromFile(VHOST_HTTPS_PATH);
 
   if (!removed) {
+    logger.error('removeDomain', 'Domínio não encontrado em nenhum arquivo', { serverName });
     throw new Error('Domínio não encontrado');
   }
 
+  logger.info('removeDomain', 'Domínio removido dos arquivos', { removedFiles });
+
   // Testar configuração após remover de AMBOS os arquivos
   try {
+    logger.debug('removeDomain', 'Executando apachectl configtest');
     await execCommand('apachectl configtest');
+    logger.info('removeDomain', 'Configuração Apache válida');
   } catch (error: any) {
     // Verificar se o erro é apenas sobre certificado SSL ausente
     const errorMsg = error.message || '';
@@ -261,15 +316,18 @@ export async function removeDomain(serverName: string): Promise<void> {
 
     if (isSSLCertError) {
       // Erro de certificado SSL - pode ser ignorado durante remoção
-      console.warn('Aviso de certificado SSL ausente (esperado durante remoção):', errorMsg);
+      logger.warn('removeDomain', 'Erro de certificado SSL (ignorado)', { error: errorMsg });
     } else {
       // Erro crítico de sintaxe - propagar
+      logger.error('removeDomain', 'Erro crítico na configuração Apache', { error: errorMsg });
       throw error;
     }
   }
 
   // Recarregar Apache
+  logger.debug('removeDomain', 'Recarregando Apache');
   await execCommand('sudo systemctl reload httpd');
+  logger.info('removeDomain', `Remoção concluída com sucesso: ${serverName}`);
 }
 
 /**
