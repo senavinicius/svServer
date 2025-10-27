@@ -41,6 +41,56 @@ export function validateDomain(domain: string): boolean {
 }
 
 /**
+ * Valida um caminho de diretório (documentRoot)
+ * - Deve ser caminho absoluto
+ * - Não pode conter path traversal (..)
+ * - Não pode acessar diretórios sensíveis do sistema
+ */
+export function validateDocumentRoot(path: string): boolean {
+  // Deve ser caminho absoluto
+  if (!path.startsWith('/')) {
+    return false;
+  }
+
+  // Não pode conter path traversal
+  if (path.includes('..')) {
+    return false;
+  }
+
+  // Lista de diretórios proibidos (sistema sensível)
+  const forbiddenPaths = [
+    '/etc',
+    '/root',
+    '/sys',
+    '/proc',
+    '/dev',
+    '/boot',
+    '/bin',
+    '/sbin',
+    '/usr/bin',
+    '/usr/sbin',
+  ];
+
+  // Verificar se o path começa com algum diretório proibido
+  for (const forbidden of forbiddenPaths) {
+    if (path === forbidden || path.startsWith(forbidden + '/')) {
+      return false;
+    }
+  }
+
+  // Path válido
+  return true;
+}
+
+/**
+ * Escapa caracteres especiais para uso seguro em comandos shell
+ */
+function escapeShellArg(arg: string): string {
+  // Envolve em aspas simples e escapa aspas simples existentes
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+/**
  * Gera configuração VirtualHost para domínio Node
  */
 function generateNodeVirtualHost(serverName: string, port: number): string {
@@ -94,6 +144,22 @@ export async function addDomain(dto: CreateDomainDTO): Promise<void> {
     throw new Error('DocumentRoot é obrigatório para domínios Static');
   }
 
+  // Validar documentRoot se fornecido
+  if (dto.type === 'static' && dto.documentRoot && !validateDocumentRoot(dto.documentRoot)) {
+    throw new Error('DocumentRoot inválido: deve ser um caminho absoluto e não pode acessar diretórios sensíveis do sistema');
+  }
+
+  // Validar porta se fornecida
+  if (dto.type === 'node' && dto.port) {
+    if (dto.port < 1 || dto.port > 65535) {
+      throw new Error('Porta inválida: deve estar entre 1 e 65535');
+    }
+    // Portas reservadas do sistema
+    if (dto.port < 1024) {
+      throw new Error('Porta inválida: portas abaixo de 1024 são reservadas');
+    }
+  }
+
   // Gerar configuração
   let vhostConfig: string;
   if (dto.type === 'node') {
@@ -122,7 +188,13 @@ export async function addDomain(dto: CreateDomainDTO): Promise<void> {
  * Mantém certificados emitidos; use `sudo certbot delete --cert-name <domínio>` manualmente se desejar removê-los.
  */
 export async function removeDomain(serverName: string): Promise<void> {
-  const sanitizedName = serverName.replace(/\./g, '\\.');
+  // Validar domínio antes de processar
+  if (!validateDomain(serverName)) {
+    throw new Error('Domínio inválido');
+  }
+
+  // Escapar todos os caracteres especiais de regex, não apenas pontos
+  const sanitizedName = serverName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   let removed = false;
 
   const removeFromFile = (filePath: string) => {
@@ -162,6 +234,26 @@ export async function removeDomain(serverName: string): Promise<void> {
  * Atualiza um domínio existente
  */
 export async function updateDomain(serverName: string, dto: UpdateDomainDto): Promise<void> {
+  // Validar domínio
+  if (!validateDomain(serverName)) {
+    throw new Error('Domínio inválido');
+  }
+
+  // Validar porta se fornecida
+  if (dto.port !== undefined) {
+    if (dto.port < 1 || dto.port > 65535) {
+      throw new Error('Porta inválida: deve estar entre 1 e 65535');
+    }
+    if (dto.port < 1024) {
+      throw new Error('Porta inválida: portas abaixo de 1024 são reservadas');
+    }
+  }
+
+  // Validar documentRoot se fornecido
+  if (dto.documentRoot !== undefined && !validateDocumentRoot(dto.documentRoot)) {
+    throw new Error('DocumentRoot inválido: deve ser um caminho absoluto e não pode acessar diretórios sensíveis do sistema');
+  }
+
   if (!existsSync(VHOST_HTTP_PATH)) {
     throw new Error('Arquivo de configuração não encontrado');
   }
@@ -170,14 +262,17 @@ export async function updateDomain(serverName: string, dto: UpdateDomainDto): Pr
 
   let newContent = content;
 
+  // Escapar caracteres especiais de regex no serverName
+  const sanitizedName = serverName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   if (dto.port !== undefined) {
     // Atualizar porta (domínio Node)
     newContent = newContent.replace(
-      new RegExp(`(ServerName ${serverName.replace('.', '\\.')}[\\s\\S]*?ProxyPass \\/[^:]+:)(\\d+)`, 'i'),
+      new RegExp(`(ServerName ${sanitizedName}[\\s\\S]*?ProxyPass \\/[^:]+:)(\\d+)`, 'i'),
       `$1${dto.port}`
     );
     newContent = newContent.replace(
-      new RegExp(`(ServerName ${serverName.replace('.', '\\.')}[\\s\\S]*?ProxyPassReverse \\/[^:]+:)(\\d+)`, 'i'),
+      new RegExp(`(ServerName ${sanitizedName}[\\s\\S]*?ProxyPassReverse \\/[^:]+:)(\\d+)`, 'i'),
       `$1${dto.port}`
     );
   }
@@ -185,11 +280,11 @@ export async function updateDomain(serverName: string, dto: UpdateDomainDto): Pr
   if (dto.documentRoot !== undefined) {
     // Atualizar DocumentRoot (domínio Static)
     newContent = newContent.replace(
-      new RegExp(`(ServerName ${serverName.replace('.', '\\.')}[\\s\\S]*?DocumentRoot )([^\\n]+)`, 'i'),
+      new RegExp(`(ServerName ${sanitizedName}[\\s\\S]*?DocumentRoot )([^\\n]+)`, 'i'),
       `$1${dto.documentRoot}`
     );
     newContent = newContent.replace(
-      new RegExp(`(ServerName ${serverName.replace('.', '\\.')}[\\s\\S]*?<Directory ")([^"]+)`, 'i'),
+      new RegExp(`(ServerName ${sanitizedName}[\\s\\S]*?<Directory ")([^"]+)`, 'i'),
       `$1${dto.documentRoot}`
     );
   }
@@ -215,8 +310,9 @@ export async function obtainSSL(domain: string): Promise<void> {
     throw new Error('Domínio inválido');
   }
 
-  // Executar certbot
-  await execCommand(`sudo certbot --apache -d ${domain} --non-interactive --agree-tos --redirect`);
+  // Executar certbot com escape seguro
+  const escapedDomain = escapeShellArg(domain);
+  await execCommand(`sudo certbot --apache -d ${escapedDomain} --non-interactive --agree-tos --redirect`);
 }
 
 /**
@@ -227,8 +323,9 @@ export async function renewSSL(domain: string): Promise<void> {
     throw new Error('Domínio inválido');
   }
 
-  // Renovar certificado específico
-  await execCommand(`sudo certbot renew --cert-name ${domain}`);
+  // Renovar certificado específico com escape seguro
+  const escapedDomain = escapeShellArg(domain);
+  await execCommand(`sudo certbot renew --cert-name ${escapedDomain}`);
 }
 
 /**
