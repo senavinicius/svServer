@@ -32,6 +32,7 @@ Dashboard web para gerenciar Apache e Certbot no próprio servidor EC2 t4g.small
 ✅ **Remover Domínio**
 - Remove VirtualHost e recarrega Apache
 - PHP legado apenas listado (sem edição/remoção)
+- Certificados existentes permanecem nos diretórios do Certbot; execute `sudo certbot delete --cert-name <domínio>` manualmente se precisar removê-los
 
 ## Docs
 
@@ -42,26 +43,16 @@ Dashboard web para gerenciar Apache e Certbot no próprio servidor EC2 t4g.small
 
 ## Instalação e Uso
 
-### 1. Desenvolvimento Local (Mac/Windows)
-
-⚠️ **IMPORTANTE**: Esta máquina é apenas para desenvolvimento. O servidor Apache e arquivos de configuração (`/etc/httpd/conf.d/`) estão no servidor EC2 remoto. Nunca execute comandos que tentam acessar arquivos do servidor Apache localmente.
-
-O sistema detecta automaticamente quando está rodando fora do Linux e usa **dados mockados**. Todas as funcionalidades funcionam com simulação!
+### 1. Execução no EC2 (Amazon Linux 2023)
 
 ```bash
 npm install
-npm run dev          # Frontend (Vite) na porta 5173
-npm run dev:server   # Backend (Express) na porta 3100
-npm run dev:all      # Ambos em paralelo
+npm run dev:server   # Backend em modo watch (Express 5 + tsx)
+npm run dev          # Opcional: Vite para hot reload do cliente
+npm run dev:all      # Opcional: frontend + backend em paralelo
 ```
 
-📖 Ver [DEV_MODE.md](./docs/DEV_MODE.md) para detalhes sobre desenvolvimento local.
-
-**O que funciona no Mac/Windows:**
-- ✅ Listar domínios (mockados)
-- ✅ Adicionar/editar/remover (simulado)
-- ✅ SSL obter/renovar (simulado)
-- ✅ Interface completa testável
+📖 Ver [DEV_MODE.md](./docs/DEV_MODE.md) para boas práticas ao trabalhar diretamente na instância.
 
 ### 2. Build para Produção
 

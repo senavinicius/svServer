@@ -8,6 +8,30 @@ const execAsync = promisify(exec);
 const VHOST_HTTP_PATH = '/etc/httpd/conf.d/vhost.conf';
 const VHOST_HTTPS_PATH = '/etc/httpd/conf.d/vhost-le-ssl.conf';
 
+interface ExecResult {
+  stdout: string;
+  stderr: string;
+}
+
+async function execCommand(command: string): Promise<ExecResult> {
+  try {
+    return await execAsync(command, { maxBuffer: 1024 * 1024 });
+  } catch (error: any) {
+    const stdout = error.stdout ?? '';
+    const stderr = error.stderr ?? '';
+    const messageParts = [
+      `Comando falhou: ${command}`,
+      stdout.trim() ? `STDOUT:\n${stdout.trim()}` : null,
+      stderr.trim() ? `STDERR:\n${stderr.trim()}` : null,
+    ].filter(Boolean);
+
+    const wrapped = new Error(messageParts.join('\n\n') || `Comando falhou: ${command}`);
+    (wrapped as any).stdout = stdout;
+    (wrapped as any).stderr = stderr;
+    throw wrapped;
+  }
+}
+
 /**
  * Valida um nome de domínio
  */
@@ -84,41 +108,54 @@ export async function addDomain(dto: CreateDomainDTO): Promise<void> {
   writeFileSync(VHOST_HTTP_PATH, newConfig, 'utf-8');
 
   // Testar configuração
-  await execAsync('apachectl configtest');
+  await execCommand('apachectl configtest');
 
   // Recarregar Apache
-  await execAsync('sudo systemctl reload httpd');
+  await execCommand('sudo systemctl reload httpd');
+
+  // Obter SSL automaticamente
+  await obtainSSL(dto.serverName);
 }
 
 /**
  * Remove um domínio do Apache
+ * Mantém certificados emitidos; use `sudo certbot delete --cert-name <domínio>` manualmente se desejar removê-los.
  */
 export async function removeDomain(serverName: string): Promise<void> {
-  if (!existsSync(VHOST_HTTP_PATH)) {
-    throw new Error('Arquivo de configuração não encontrado');
-  }
+  const sanitizedName = serverName.replace(/\./g, '\\.');
+  let removed = false;
 
-  const content = readFileSync(VHOST_HTTP_PATH, 'utf-8');
+  const removeFromFile = (filePath: string) => {
+    if (!existsSync(filePath)) {
+      return;
+    }
 
-  // Remover o bloco VirtualHost correspondente
-  const vhostRegex = new RegExp(
-    `<VirtualHost[^>]*>[\\s\\S]*?ServerName ${serverName.replace('.', '\\.')}[\\s\\S]*?<\\/VirtualHost>`,
-    'gi'
-  );
+    const content = readFileSync(filePath, 'utf-8');
+    const vhostRegex = new RegExp(
+      `<VirtualHost[^>]*>[\\s\\S]*?ServerName ${sanitizedName}[\\s\\S]*?<\\/VirtualHost>`,
+      'gi'
+    );
 
-  const newContent = content.replace(vhostRegex, '');
+    const newContent = content.replace(vhostRegex, '');
 
-  if (newContent === content) {
+    if (newContent !== content) {
+      writeFileSync(filePath, newContent, 'utf-8');
+      removed = true;
+    }
+  };
+
+  removeFromFile(VHOST_HTTP_PATH);
+  removeFromFile(VHOST_HTTPS_PATH);
+
+  if (!removed) {
     throw new Error('Domínio não encontrado');
   }
 
-  writeFileSync(VHOST_HTTP_PATH, newContent, 'utf-8');
-
   // Testar configuração
-  await execAsync('apachectl configtest');
+  await execCommand('apachectl configtest');
 
   // Recarregar Apache
-  await execAsync('sudo systemctl reload httpd');
+  await execCommand('sudo systemctl reload httpd');
 }
 
 /**
@@ -164,10 +201,10 @@ export async function updateDomain(serverName: string, dto: UpdateDomainDto): Pr
   writeFileSync(VHOST_HTTP_PATH, newContent, 'utf-8');
 
   // Testar configuração
-  await execAsync('apachectl configtest');
+  await execCommand('apachectl configtest');
 
   // Recarregar Apache
-  await execAsync('sudo systemctl reload httpd');
+  await execCommand('sudo systemctl reload httpd');
 }
 
 /**
@@ -179,7 +216,7 @@ export async function obtainSSL(domain: string): Promise<void> {
   }
 
   // Executar certbot
-  await execAsync(`sudo certbot --apache -d ${domain} --non-interactive --agree-tos --redirect`);
+  await execCommand(`sudo certbot --apache -d ${domain} --non-interactive --agree-tos --redirect`);
 }
 
 /**
@@ -191,7 +228,7 @@ export async function renewSSL(domain: string): Promise<void> {
   }
 
   // Renovar certificado específico
-  await execAsync(`sudo certbot renew --cert-name ${domain}`);
+  await execCommand(`sudo certbot renew --cert-name ${domain}`);
 }
 
 /**
@@ -218,23 +255,23 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   // Fazer backup do arquivo atual se existir
   if (existsSync(filePath)) {
     try {
-      await execAsync(`sudo cp ${filePath} ${backupPath}`);
+      await execCommand(`sudo cp ${filePath} ${backupPath}`);
       console.log(`Backup criado: ${backupPath}`);
     } catch (error) {
       // Limpar arquivo temporário
-      try { await execAsync(`rm -f ${tempPath}`); } catch {}
+      try { await execCommand(`rm -f ${tempPath}`); } catch {}
       throw new Error(`Falha ao criar backup: ${error}`);
     }
   }
 
   // Copiar arquivo temporário para o destino final (com sudo)
   try {
-    await execAsync(`sudo cp ${tempPath} ${filePath}`);
-    await execAsync(`sudo chmod 644 ${filePath}`);
+    await execCommand(`sudo cp ${tempPath} ${filePath}`);
+    await execCommand(`sudo chmod 644 ${filePath}`);
     console.log(`Arquivo copiado para: ${filePath}`);
   } catch (error) {
     // Limpar arquivo temporário
-    try { await execAsync(`rm -f ${tempPath}`); } catch {}
+    try { await execCommand(`rm -f ${tempPath}`); } catch {}
     throw new Error(`Falha ao copiar arquivo: ${error}`);
   }
 
@@ -243,12 +280,14 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   let isValid = false;
 
   try {
-    const result = await execAsync('apachectl configtest 2>&1');
+    const result = await execCommand('apachectl configtest 2>&1');
     validationOutput = result.stdout + result.stderr;
   } catch (error: any) {
     // apachectl configtest pode retornar exit code != 0 mesmo com warnings
     // O importante é verificar se tem "Syntax OK" na saída
-    validationOutput = (error.stdout || '') + (error.stderr || '');
+    const stdout = error?.stdout || '';
+    const stderr = error?.stderr || '';
+    validationOutput = stdout + stderr;
   }
 
   console.log('apachectl configtest output:', validationOutput);
@@ -260,7 +299,7 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     // Salvar arquivo com erro para inspeção
     const errorPath = `${filePath}.error`;
     try {
-      await execAsync(`sudo cp ${filePath} ${errorPath}`);
+      await execCommand(`sudo cp ${filePath} ${errorPath}`);
       console.log(`Arquivo com erro salvo em: ${errorPath}`);
     } catch (saveError) {
       console.error('Erro ao salvar arquivo com erro:', saveError);
@@ -269,40 +308,40 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     // Restaurar backup em caso de erro
     if (existsSync(backupPath)) {
       try {
-        await execAsync(`sudo cp ${backupPath} ${filePath}`);
+        await execCommand(`sudo cp ${backupPath} ${filePath}`);
         console.log(`Backup restaurado devido a erro de validação`);
       } catch (restoreError) {
         console.error('Erro ao restaurar backup:', restoreError);
       }
     }
     // Limpar arquivo temporário
-    try { await execAsync(`rm -f ${tempPath}`); } catch {}
+    try { await execCommand(`rm -f ${tempPath}`); } catch {}
     throw new Error(`Validação falhou: ${validationOutput}\n\nArquivo com erro salvo em: ${errorPath}`);
   }
 
   // Se chegou aqui, validação passou - recarregar Apache
   try {
-    await execAsync('sudo systemctl reload httpd');
+    await execCommand('sudo systemctl reload httpd');
     console.log('Apache recarregado com sucesso');
   } catch (error: any) {
     // Restaurar backup se reload falhar
     if (existsSync(backupPath)) {
       try {
-        await execAsync(`sudo cp ${backupPath} ${filePath}`);
-        await execAsync('sudo systemctl reload httpd'); // tentar recarregar com backup
+        await execCommand(`sudo cp ${backupPath} ${filePath}`);
+        await execCommand('sudo systemctl reload httpd'); // tentar recarregar com backup
         console.log(`Backup restaurado devido a erro no reload`);
       } catch (restoreError) {
         console.error('Erro ao restaurar backup:', restoreError);
       }
     }
     // Limpar arquivo temporário
-    try { await execAsync(`rm -f ${tempPath}`); } catch {}
+    try { await execCommand(`rm -f ${tempPath}`); } catch {}
     throw new Error(`Falha ao recarregar Apache: ${error.message || error}`);
   }
 
   // Limpar arquivo temporário
   try {
-    await execAsync(`rm -f ${tempPath}`);
+    await execCommand(`rm -f ${tempPath}`);
     console.log('Arquivo temporário removido');
   } catch (error) {
     console.warn('Aviso: não foi possível remover arquivo temporário:', tempPath);

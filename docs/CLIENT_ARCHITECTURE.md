@@ -244,7 +244,7 @@ Atualmente não há testes automatizados. Para adicionar:
 
 - **Vitest**: Para testes unitários de funções puras (render.ts, helpers)
 - **Playwright/Cypress**: Para testes E2E da interface
-- **MSW**: Para mockar API durante testes
+- **Integração**: Para testes de API, utilize instâncias controladas do backend (ex.: staging)
 
 ## Referências
 

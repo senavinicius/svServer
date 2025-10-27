@@ -3,7 +3,7 @@
 ## Stack
 
 - **Frontend**: Vite + TypeScript vanilla + svFramework
-- **Backend**: Node.js 18+ + Express 4.x
+- **Backend**: Node.js 18+ + Express 5.x
 - **Execução**: Local no EC2 via `child_process`
 
 ## Por que Express?
