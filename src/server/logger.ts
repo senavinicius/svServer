@@ -1,10 +1,3 @@
-import { existsSync, mkdirSync, appendFileSync } from 'fs';
-import { join } from 'path';
-
-// Diretório de logs
-const LOG_DIR = '/var/log/ec2-manager';
-const LOG_FILE = join(LOG_DIR, 'operations.log');
-
 // Níveis de log
 export const LogLevel = {
   DEBUG: 'DEBUG',
@@ -15,7 +8,8 @@ export const LogLevel = {
 
 export type LogLevel = typeof LogLevel[keyof typeof LogLevel];
 
-interface LogEntry {
+export interface LogEntry {
+  id: string;
   timestamp: string;
   level: LogLevel;
   operation: string;
@@ -23,32 +17,56 @@ interface LogEntry {
   data?: any;
 }
 
+// Armazenar logs em memória (últimos 500)
+const MAX_LOGS = 500;
+const logs: LogEntry[] = [];
+
+// Listeners para logs em tempo real
+type LogListener = (entry: LogEntry) => void;
+const listeners: Set<LogListener> = new Set();
+
 /**
- * Garante que o diretório de logs existe
+ * Adiciona um listener para receber logs em tempo real
  */
-function ensureLogDir(): void {
-  try {
-    if (!existsSync(LOG_DIR)) {
-      mkdirSync(LOG_DIR, { recursive: true, mode: 0o755 });
-    }
-  } catch (error) {
-    console.error('Erro ao criar diretório de logs:', error);
-  }
+export function addLogListener(listener: LogListener): void {
+  listeners.add(listener);
 }
 
 /**
- * Formata uma entrada de log
+ * Remove um listener
+ */
+export function removeLogListener(listener: LogListener): void {
+  listeners.delete(listener);
+}
+
+/**
+ * Retorna todos os logs armazenados
+ */
+export function getAllLogs(): LogEntry[] {
+  return [...logs];
+}
+
+/**
+ * Limpa todos os logs
+ */
+export function clearLogs(): void {
+  logs.length = 0;
+}
+
+/**
+ * Formata uma entrada de log para console
  */
 function formatLogEntry(entry: LogEntry): string {
   const dataStr = entry.data ? `\n  Data: ${JSON.stringify(entry.data, null, 2)}` : '';
-  return `[${entry.timestamp}] [${entry.level}] [${entry.operation}] ${entry.message}${dataStr}\n`;
+  return `[${entry.timestamp}] [${entry.level}] [${entry.operation}] ${entry.message}${dataStr}`;
 }
 
 /**
- * Escreve log no arquivo e no console
+ * Escreve log e notifica listeners
  */
 function writeLog(level: LogLevel, operation: string, message: string, data?: any): void {
   const entry: LogEntry = {
+    id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
     timestamp: new Date().toISOString(),
     level,
     operation,
@@ -56,9 +74,16 @@ function writeLog(level: LogLevel, operation: string, message: string, data?: an
     data,
   };
 
-  const formattedLog = formatLogEntry(entry);
+  // Adicionar aos logs em memória
+  logs.push(entry);
 
-  // Log no console (sempre)
+  // Manter apenas os últimos MAX_LOGS
+  if (logs.length > MAX_LOGS) {
+    logs.shift();
+  }
+
+  // Log no console
+  const formattedLog = formatLogEntry(entry);
   switch (level) {
     case LogLevel.ERROR:
       console.error(formattedLog);
@@ -73,13 +98,14 @@ function writeLog(level: LogLevel, operation: string, message: string, data?: an
       console.log(formattedLog);
   }
 
-  // Log no arquivo
-  try {
-    ensureLogDir();
-    appendFileSync(LOG_FILE, formattedLog, { encoding: 'utf-8', mode: 0o644 });
-  } catch (error) {
-    console.error('Erro ao escrever no arquivo de log:', error);
-  }
+  // Notificar todos os listeners (frontend ao vivo)
+  listeners.forEach(listener => {
+    try {
+      listener(entry);
+    } catch (error) {
+      console.error('Erro ao notificar listener:', error);
+    }
+  });
 }
 
 /**
@@ -119,6 +145,5 @@ export const logger = {
   },
 };
 
-// Criar diretório de logs na inicialização
-ensureLogDir();
-logger.info('SYSTEM', 'Logger inicializado', { logFile: LOG_FILE });
+// Log de inicialização
+logger.info('SYSTEM', 'Logger inicializado - logs em memória para streaming ao vivo');

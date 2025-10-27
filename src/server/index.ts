@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL, replaceConfigFile } from './manager.js';
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
+import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry } from './logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3100;
@@ -342,6 +343,58 @@ app.post('/api/config/upload/:type', async (req, res) => {
     };
     res.status(400).json(response);
   }
+});
+
+/**
+ * GET /api/logs - Retorna todos os logs armazenados
+ */
+app.get('/api/logs', (_req, res) => {
+  const logs = getAllLogs();
+  const response: ApiResponse<LogEntry[]> = {
+    success: true,
+    data: logs,
+  };
+  res.json(response);
+});
+
+/**
+ * DELETE /api/logs - Limpa todos os logs
+ */
+app.delete('/api/logs', (_req, res) => {
+  clearLogs();
+  const response: ApiResponse = {
+    success: true,
+  };
+  res.json(response);
+});
+
+/**
+ * GET /api/logs/stream - Server-Sent Events para logs em tempo real
+ */
+app.get('/api/logs/stream', (req, res) => {
+  // Configurar SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Enviar logs existentes imediatamente
+  const existingLogs = getAllLogs();
+  res.write(`data: ${JSON.stringify({ type: 'init', logs: existingLogs })}\n\n`);
+
+  // Criar listener para novos logs
+  const listener = (entry: LogEntry) => {
+    res.write(`data: ${JSON.stringify({ type: 'log', log: entry })}\n\n`);
+  };
+
+  // Adicionar listener
+  addLogListener(listener);
+
+  // Remover listener quando a conexão fechar
+  req.on('close', () => {
+    removeLogListener(listener);
+    res.end();
+  });
 });
 
 // Iniciar servidor
