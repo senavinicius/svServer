@@ -50,11 +50,11 @@ function render() {
         </div>
       </div>
 
-      ${state.logsVisible ? renderLogsPanel(state.logs) : ''}
-
       <div class="domains-list">
         ${renderDomainsList(state.domains, state.isLoading, state.error)}
       </div>
+
+      ${state.logsVisible ? renderLogsPanel(state.logs) : ''}
     </div>
 
     ${renderModal(state.modal.isOpen, state.modal.mode, state.modal.editingVHost)}
