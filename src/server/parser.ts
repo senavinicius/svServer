@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import type { VirtualHost, DomainType, SSLInfo } from '../shared/types.js';
 import { createHash } from 'crypto';
+import { logger } from './logger.js';
 
 const VHOST_HTTP_PATH = '/etc/httpd/conf.d/vhost.conf';
 const VHOST_HTTPS_PATH = '/etc/httpd/conf.d/vhost-le-ssl.conf';
@@ -34,7 +35,7 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
   for (const block of blocks) {
     // Se não há ServerName, pula
     if (!block.serverName) {
-      console.error('❌ BLOCO DESCARTADO (sem ServerName):', {
+      logger.warn('parseApacheConfig', 'Bloco VirtualHost descartado (sem ServerName)', {
         directives: Array.from(block.directives.keys()),
         allDirectiveValues: Object.fromEntries(block.directives),
         rawConfigPreview: block.rawConfig.substring(0, 300)

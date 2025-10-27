@@ -444,8 +444,9 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   // Escrever conteúdo em arquivo temporário (não precisa de sudo)
   try {
     writeFileSync(tempPath, content, 'utf-8');
-    console.log(`Arquivo temporário criado: ${tempPath}`);
+    logger.debug('replaceConfigFile', `Arquivo temporário criado: ${tempPath}`);
   } catch (error) {
+    logger.error('replaceConfigFile', 'Falha ao criar arquivo temporário', { error });
     throw new Error(`Falha ao criar arquivo temporário: ${error}`);
   }
 
@@ -453,10 +454,11 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   if (existsSync(filePath)) {
     try {
       await execCommand(`sudo cp ${filePath} ${backupPath}`);
-      console.log(`Backup criado: ${backupPath}`);
+      logger.info('replaceConfigFile', `Backup criado: ${backupPath}`);
     } catch (error) {
       // Limpar arquivo temporário
       try { await execCommand(`rm -f ${tempPath}`); } catch {}
+      logger.error('replaceConfigFile', 'Falha ao criar backup', { error });
       throw new Error(`Falha ao criar backup: ${error}`);
     }
   }
@@ -465,10 +467,11 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   try {
     await execCommand(`sudo cp ${tempPath} ${filePath}`);
     await execCommand(`sudo chmod 644 ${filePath}`);
-    console.log(`Arquivo copiado para: ${filePath}`);
+    logger.info('replaceConfigFile', `Arquivo copiado para: ${filePath}`);
   } catch (error) {
     // Limpar arquivo temporário
     try { await execCommand(`rm -f ${tempPath}`); } catch {}
+    logger.error('replaceConfigFile', 'Falha ao copiar arquivo', { error });
     throw new Error(`Falha ao copiar arquivo: ${error}`);
   }
 
@@ -487,7 +490,7 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     validationOutput = stdout + stderr;
   }
 
-  console.log('apachectl configtest output:', validationOutput);
+  logger.debug('replaceConfigFile', 'apachectl configtest output', { validationOutput });
 
   // Verificar se a saída contém "Syntax OK"
   isValid = validationOutput.includes('Syntax OK');
@@ -497,51 +500,53 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     const errorPath = `${filePath}.error`;
     try {
       await execCommand(`sudo cp ${filePath} ${errorPath}`);
-      console.log(`Arquivo com erro salvo em: ${errorPath}`);
+      logger.warn('replaceConfigFile', `Arquivo com erro salvo em: ${errorPath}`);
     } catch (saveError) {
-      console.error('Erro ao salvar arquivo com erro:', saveError);
+      logger.error('replaceConfigFile', 'Erro ao salvar arquivo com erro', { saveError });
     }
 
     // Restaurar backup em caso de erro
     if (existsSync(backupPath)) {
       try {
         await execCommand(`sudo cp ${backupPath} ${filePath}`);
-        console.log(`Backup restaurado devido a erro de validação`);
+        logger.info('replaceConfigFile', 'Backup restaurado devido a erro de validação');
       } catch (restoreError) {
-        console.error('Erro ao restaurar backup:', restoreError);
+        logger.error('replaceConfigFile', 'Erro ao restaurar backup', { restoreError });
       }
     }
     // Limpar arquivo temporário
     try { await execCommand(`rm -f ${tempPath}`); } catch {}
+    logger.error('replaceConfigFile', 'Validação falhou', { validationOutput, errorPath });
     throw new Error(`Validação falhou: ${validationOutput}\n\nArquivo com erro salvo em: ${errorPath}`);
   }
 
   // Se chegou aqui, validação passou - recarregar Apache
   try {
     await execCommand('sudo systemctl reload httpd');
-    console.log('Apache recarregado com sucesso');
+    logger.info('replaceConfigFile', 'Apache recarregado com sucesso');
   } catch (error: any) {
     // Restaurar backup se reload falhar
     if (existsSync(backupPath)) {
       try {
         await execCommand(`sudo cp ${backupPath} ${filePath}`);
         await execCommand('sudo systemctl reload httpd'); // tentar recarregar com backup
-        console.log(`Backup restaurado devido a erro no reload`);
+        logger.info('replaceConfigFile', 'Backup restaurado devido a erro no reload');
       } catch (restoreError) {
-        console.error('Erro ao restaurar backup:', restoreError);
+        logger.error('replaceConfigFile', 'Erro ao restaurar backup', { restoreError });
       }
     }
     // Limpar arquivo temporário
     try { await execCommand(`rm -f ${tempPath}`); } catch {}
+    logger.error('replaceConfigFile', 'Falha ao recarregar Apache', { error: error.message || error });
     throw new Error(`Falha ao recarregar Apache: ${error.message || error}`);
   }
 
   // Limpar arquivo temporário
   try {
     await execCommand(`rm -f ${tempPath}`);
-    console.log('Arquivo temporário removido');
+    logger.debug('replaceConfigFile', 'Arquivo temporário removido');
   } catch (error) {
-    console.warn('Aviso: não foi possível remover arquivo temporário:', tempPath);
+    logger.warn('replaceConfigFile', 'Não foi possível remover arquivo temporário', { tempPath });
   }
 
   // Retornar sucesso com output da validação
