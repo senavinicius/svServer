@@ -255,8 +255,9 @@ export async function removeDomain(serverName: string): Promise<void> {
 
     // REGEX CORRIGIDA: Usar non-greedy match e garantir que ServerName é exato
     // A regex anterior era muito gulosa e podia capturar múltiplos VirtualHosts
+    // (?:\s|$) = espaço OU fim de linha (para pegar ServerName no final da linha)
     const vhostRegex = new RegExp(
-      `<VirtualHost[^>]*>\\s*?[\\s\\S]*?ServerName\\s+${sanitizedName}(?:\\s|\\n)[\\s\\S]*?<\\/VirtualHost>\\s*?`,
+      `<VirtualHost[^>]*>\\s*?[\\s\\S]*?ServerName\\s+${sanitizedName}(?:\\s|$)[\\s\\S]*?<\\/VirtualHost>\\s*?`,
       'gm'
     );
 
