@@ -15,13 +15,31 @@ interface ExecResult {
 }
 
 async function execCommand(command: string): Promise<ExecResult> {
+  logger.debug('execCommand', `Executando comando: ${command}`);
+
   try {
-    return await execAsync(command, { maxBuffer: 1024 * 1024 });
+    const result = await execAsync(command, { maxBuffer: 1024 * 1024 });
+    logger.debug('execCommand', 'Comando executado com sucesso', {
+      command,
+      stdout: result.stdout.substring(0, 500),
+      stderr: result.stderr.substring(0, 500),
+    });
+    return result;
   } catch (error: any) {
     const stdout = error.stdout ?? '';
     const stderr = error.stderr ?? '';
+    const exitCode = error.code ?? 'unknown';
+
+    logger.error('execCommand', 'Comando falhou', {
+      command,
+      exitCode,
+      stdout: stdout.substring(0, 500),
+      stderr: stderr.substring(0, 500),
+    });
+
     const messageParts = [
       `Comando falhou: ${command}`,
+      `Exit code: ${exitCode}`,
       stdout.trim() ? `STDOUT:\n${stdout.trim()}` : null,
       stderr.trim() ? `STDERR:\n${stderr.trim()}` : null,
     ].filter(Boolean);
@@ -29,6 +47,7 @@ async function execCommand(command: string): Promise<ExecResult> {
     const wrapped = new Error(messageParts.join('\n\n') || `Comando falhou: ${command}`);
     (wrapped as any).stdout = stdout;
     (wrapped as any).stderr = stderr;
+    (wrapped as any).exitCode = exitCode;
     throw wrapped;
   }
 }
@@ -233,6 +252,18 @@ export async function addDomain(dto: CreateDomainDTO): Promise<void> {
 export async function removeDomain(serverName: string): Promise<void> {
   logger.info('removeDomain', `Iniciando remoção de domínio: ${serverName}`);
 
+  // Log do usuário que está executando
+  try {
+    const whoami = await execCommand('whoami');
+    const canSudo = await execCommand('sudo -n true 2>&1 && echo "yes" || echo "no"');
+    logger.info('removeDomain', 'Informações do usuário', {
+      user: whoami.stdout.trim(),
+      canSudoWithoutPassword: canSudo.stdout.trim(),
+    });
+  } catch (error) {
+    logger.warn('removeDomain', 'Não foi possível verificar usuário/sudo', { error });
+  }
+
   // Validar domínio antes de processar
   if (!validateDomain(serverName)) {
     logger.error('removeDomain', 'Domínio inválido', { serverName });
@@ -248,6 +279,17 @@ export async function removeDomain(serverName: string): Promise<void> {
     if (!existsSync(filePath)) {
       logger.debug('removeFromFile', `Arquivo não existe: ${filePath}`);
       return;
+    }
+
+    // Verificar permissões do arquivo
+    try {
+      const stats = await execCommand(`ls -la ${escapeShellArg(filePath)}`);
+      logger.debug('removeFromFile', 'Permissões do arquivo', {
+        filePath,
+        permissions: stats.stdout.trim(),
+      });
+    } catch (error) {
+      logger.warn('removeFromFile', 'Não foi possível verificar permissões', { filePath, error });
     }
 
     const content = readFileSync(filePath, 'utf-8');
@@ -304,6 +346,20 @@ export async function removeDomain(serverName: string): Promise<void> {
   logger.info('removeDomain', 'Domínio removido dos arquivos', { removedFiles });
 
   // Testar configuração após remover de AMBOS os arquivos
+  logger.info('removeDomain', 'Testando configuração Apache...');
+
+  // Primeiro, verificar se apachectl tem permissão para ler os arquivos
+  try {
+    const httpCheck = await execCommand(`sudo test -r ${VHOST_HTTP_PATH} && echo "readable" || echo "not readable"`);
+    const httpsCheck = await execCommand(`sudo test -r ${VHOST_HTTPS_PATH} && echo "readable" || echo "not readable"`);
+    logger.debug('removeDomain', 'Verificação de leitura dos arquivos', {
+      http: httpCheck.stdout.trim(),
+      https: httpsCheck.stdout.trim(),
+    });
+  } catch (error) {
+    logger.warn('removeDomain', 'Não foi possível verificar leitura dos arquivos', { error });
+  }
+
   try {
     logger.debug('removeDomain', 'Executando apachectl configtest');
     await execCommand('apachectl configtest');
@@ -311,13 +367,27 @@ export async function removeDomain(serverName: string): Promise<void> {
   } catch (error: any) {
     // Verificar se o erro é apenas sobre certificado SSL ausente
     const errorMsg = error.message || '';
+    const stdout = error.stdout || '';
+    const stderr = error.stderr || '';
+
+    logger.warn('removeDomain', 'apachectl configtest falhou', {
+      errorMsg,
+      stdout,
+      stderr,
+      exitCode: error.exitCode,
+    });
+
     const isSSLCertError = errorMsg.includes('SSLCertificateFile') ||
                           errorMsg.includes('does not exist or is empty') ||
-                          errorMsg.includes('/etc/letsencrypt/');
+                          errorMsg.includes('/etc/letsencrypt/') ||
+                          stderr.includes('SSLCertificateFile');
 
     if (isSSLCertError) {
       // Erro de certificado SSL - pode ser ignorado durante remoção
-      logger.warn('removeDomain', 'Erro de certificado SSL (ignorado)', { error: errorMsg });
+      logger.warn('removeDomain', 'Erro de certificado SSL detectado (será ignorado)', {
+        error: errorMsg,
+        reason: 'Certificado pode ter sido removido mas bloco ainda existe em outro arquivo',
+      });
     } else {
       // Erro crítico de sintaxe - propagar
       logger.error('removeDomain', 'Erro crítico na configuração Apache', { error: errorMsg });
