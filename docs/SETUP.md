@@ -22,12 +22,14 @@
 
 ### Sudoers (configuração necessária)
 
-**Editar sudoers:**
+**Criar/editar arquivo de sudoers do ec2-user:**
 ```bash
-sudo visudo
+sudo vim /etc/sudoers.d/ec2-user
 ```
 
-**Adicionar estas linhas:**
+**IMPORTANTE:** Use `/etc/sudoers.d/` ao invés de editar `/etc/sudoers` diretamente!
+
+**Adicionar estas linhas no arquivo:**
 ```
 ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl reload httpd
 ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl restart httpd
@@ -41,10 +43,18 @@ ec2-user ALL=(root) NOPASSWD: /usr/bin/chmod
 ec2-user ALL=(root) NOPASSWD: /usr/bin/test
 ```
 
-**Verificar:**
+**Salvar e sair do vim:**
+- Aperte `i` para entrar no modo INSERT
+- Cole as linhas
+- Aperte `ESC` para sair do modo INSERT
+- Digite `:wq` e aperte `ENTER`
+
+**Verificar permissões:**
 ```bash
 sudo -l
 ```
+
+Deve listar todos os comandos acima.
 
 ## Permissões
 
