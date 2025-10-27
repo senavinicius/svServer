@@ -1,4 +1,5 @@
 import type { Domain, VirtualHost } from '../shared/types.js';
+import type { LogEntry } from '../server/logger.js';
 
 /**
  * Configuração de ícones e labels por tipo
@@ -260,4 +261,52 @@ export function renderSystemStatus(diagnostics: any): string {
       ${problems.map(p => `<div>${p}</div>`).join('')}
     </div>
   `;
+}
+
+/**
+ * Renderiza o painel de logs em tempo real
+ */
+export function renderLogsPanel(logs: LogEntry[]): string {
+  return `
+    <div class="logs-panel">
+      <div class="logs-header">
+        <h3>📋 Logs do Sistema (Tempo Real)</h3>
+        <button class="btn btn-danger btn-small" id="clear-logs-btn">🗑️ Limpar</button>
+      </div>
+      <div class="logs-container" id="logs-container">
+        ${logs.length === 0
+          ? '<div class="log-entry log-info">Nenhum log ainda. As operações aparecerão aqui em tempo real...</div>'
+          : logs.map(renderLogEntry).join('')
+        }
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renderiza uma entrada de log individual
+ */
+function renderLogEntry(log: LogEntry): string {
+  const levelClass = `log-${log.level.toLowerCase()}`;
+  const time = new Date(log.timestamp).toLocaleTimeString('pt-BR');
+  const dataStr = log.data ? `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : '';
+
+  return `
+    <div class="log-entry ${levelClass}">
+      <span class="log-time">${time}</span>
+      <span class="log-level">[${log.level}]</span>
+      <span class="log-operation">[${log.operation}]</span>
+      <span class="log-message">${escapeHtml(log.message)}</span>
+      ${dataStr}
+    </div>
+  `;
+}
+
+/**
+ * Escapa HTML para prevenir XSS
+ */
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

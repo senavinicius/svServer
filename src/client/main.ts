@@ -1,7 +1,8 @@
 import './style.css';
 import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDTO } from '../shared/types.js';
-import { renderDomainsList, renderModal, renderSystemStatus } from './render.js';
+import { renderDomainsList, renderModal, renderSystemStatus, renderLogsPanel } from './render.js';
+import type { LogEntry } from '../server/logger.js';
 
 /**
  * Estado global da aplicação
@@ -15,7 +16,9 @@ const state = {
     isOpen: false,
     mode: 'add' as 'add' | 'edit',
     editingVHost: null as VirtualHost | null,
-  }
+  },
+  logs: [] as LogEntry[],
+  logsVisible: true,
 };
 
 /**
@@ -39,8 +42,15 @@ function render() {
           <button class="btn btn-secondary btn-small" id="download-https-btn">⬇ HTTPS Config</button>
           <button class="btn btn-success btn-small" id="upload-http-btn">⬆ Upload HTTP</button>
         </div>
-        <button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
+        <div class="toolbar-right">
+          <button class="btn btn-secondary btn-small" id="toggle-logs-btn">
+            ${state.logsVisible ? '🔽 Ocultar Logs' : '🔼 Mostrar Logs'}
+          </button>
+          <button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
+        </div>
       </div>
+
+      ${state.logsVisible ? renderLogsPanel(state.logs) : ''}
 
       <div class="domains-list">
         ${renderDomainsList(state.domains, state.isLoading, state.error)}
@@ -65,6 +75,8 @@ function attachEventListeners() {
   document.getElementById('download-http-btn')?.addEventListener('click', () => downloadConfig('http'));
   document.getElementById('download-https-btn')?.addEventListener('click', () => downloadConfig('https'));
   document.getElementById('upload-http-btn')?.addEventListener('click', () => uploadConfig('http'));
+  document.getElementById('toggle-logs-btn')?.addEventListener('click', toggleLogs);
+  document.getElementById('clear-logs-btn')?.addEventListener('click', clearLogsUI);
 
   // Ações dos domínios (delegação de eventos)
   document.querySelectorAll('[data-action]').forEach(btn => {
@@ -369,11 +381,82 @@ async function uploadConfig(type: 'http' | 'https') {
 }
 
 /**
+ * Toggle visibilidade do painel de logs
+ */
+function toggleLogs() {
+  state.logsVisible = !state.logsVisible;
+  render();
+}
+
+/**
+ * Limpar logs
+ */
+async function clearLogsUI() {
+  if (!confirm('Limpar todos os logs?')) return;
+
+  try {
+    const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
+    await fetch(`${baseUrl}/api/logs`, { method: 'DELETE' });
+    state.logs = [];
+    render();
+  } catch (err: any) {
+    alert(`Erro ao limpar logs: ${err.message}`);
+  }
+}
+
+/**
+ * Conecta ao stream de logs em tempo real via SSE
+ */
+function connectToLogStream() {
+  const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
+  const eventSource = new EventSource(`${baseUrl}/api/logs/stream`);
+
+  eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.type === 'init') {
+      // Logs iniciais
+      state.logs = data.logs;
+      render();
+    } else if (data.type === 'log') {
+      // Novo log em tempo real
+      state.logs.push(data.log);
+
+      // Manter apenas os últimos 500
+      if (state.logs.length > 500) {
+        state.logs.shift();
+      }
+
+      render();
+
+      // Auto-scroll para o final
+      setTimeout(() => {
+        const logsContainer = document.getElementById('logs-container');
+        if (logsContainer) {
+          logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+      }, 10);
+    }
+  };
+
+  eventSource.onerror = (error) => {
+    console.error('Erro no stream de logs:', error);
+    eventSource.close();
+
+    // Tentar reconectar após 5 segundos
+    setTimeout(connectToLogStream, 5000);
+  };
+
+  return eventSource;
+}
+
+/**
  * Inicialização da aplicação
  */
 function init() {
   loadDomains();
   loadDiagnostics();
+  connectToLogStream();
 }
 
 // Iniciar aplicação
