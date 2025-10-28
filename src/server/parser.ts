@@ -92,13 +92,7 @@ function parseDirectives(content: string): Map<string, string[]> {
   let currentValue = '';
 
   for (let line of lines) {
-    // Remove comentários (preserva apenas a parte antes do #)
-    const commentIndex = line.indexOf('#');
-    if (commentIndex !== -1) {
-      line = line.substring(0, commentIndex);
-    }
-
-    // Normaliza espaços
+    // Normaliza espaços primeiro
     line = line.trim();
 
     // Pula linhas vazias
@@ -111,9 +105,9 @@ function parseDirectives(content: string): Map<string, string[]> {
       continue;
     }
 
-    // Detecta início de diretiva (palavra no início da linha, suporta hífen)
-    // Permite espaço opcional após o nome da diretiva
-    const directiveMatch = line.match(/^([A-Za-z][A-Za-z0-9_-]*)(?:\s+(.*))?$/);
+    // Detecta início de diretiva (palavra no início da linha, suporta hífen e # comentado)
+    // Permite # opcional no início, seguido de espaços opcionais
+    const directiveMatch = line.match(/^#?\s*([A-Za-z][A-Za-z0-9_-]*)(?:\s+(.*))?$/);
 
     if (directiveMatch) {
       // Finaliza diretiva anterior se houver
@@ -136,10 +130,12 @@ function parseDirectives(content: string): Map<string, string[]> {
       }
     } else if (currentDirective) {
       // Continuação de diretiva multi-linha
-      if (line.endsWith('\\')) {
-        currentValue += line.slice(0, -1).trim() + ' ';
+      // Remove # do início se houver
+      const cleanLine = line.replace(/^#\s*/, '');
+      if (cleanLine.endsWith('\\')) {
+        currentValue += cleanLine.slice(0, -1).trim() + ' ';
       } else {
-        currentValue += line;
+        currentValue += cleanLine;
         addDirective(directives, currentDirective, currentValue.trim());
         currentDirective = null;
         currentValue = '';
