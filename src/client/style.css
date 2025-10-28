@@ -656,6 +656,19 @@ body {
   word-break: break-all;
 }
 
+.log-rawconfig {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-sm);
+  color: #c9d1d9;
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.5;
+}
+
 /* Cores por nível de log */
 .log-debug {
   border-left-color: #64748b;
