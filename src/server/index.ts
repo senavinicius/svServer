@@ -10,29 +10,29 @@ const PORT = process.env.PORT || 3100;
 
 // Verificar arquivos APENAS UMA VEZ na inicialização
 function checkSystemFiles() {
-  const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
-  const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
-  const sslDirExists = existsSync('/etc/letsencrypt/renewal');
+	const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
+	const httpsExists = existsSync('/etc/httpd/conf.d/vhost-le-ssl.conf');
+	const sslDirExists = existsSync('/etc/letsencrypt/renewal');
 
-  return {
-    server: {
-      platform: process.platform,
-      nodeVersion: process.version,
-      pid: process.pid,
-      uptime: process.uptime(),
-    },
-    apache: {
-      httpConfigExists: httpExists,
-      httpConfigPath: '/etc/httpd/conf.d/vhost.conf',
-      httpsConfigExists: httpsExists,
-      httpsConfigPath: '/etc/httpd/conf.d/vhost-le-ssl.conf',
-    },
-    ssl: {
-      renewalDirExists: sslDirExists,
-      renewalDirPath: '/etc/letsencrypt/renewal',
-    },
-    timestamp: new Date().toISOString(),
-  };
+	return {
+		server: {
+			platform: process.platform,
+			nodeVersion: process.version,
+			pid: process.pid,
+			uptime: process.uptime(),
+		},
+		apache: {
+			httpConfigExists: httpExists,
+			httpConfigPath: '/etc/httpd/conf.d/vhost.conf',
+			httpsConfigExists: httpsExists,
+			httpsConfigPath: '/etc/httpd/conf.d/vhost-le-ssl.conf',
+		},
+		ssl: {
+			renewalDirExists: sslDirExists,
+			renewalDirPath: '/etc/letsencrypt/renewal',
+		},
+		timestamp: new Date().toISOString(),
+	};
 }
 
 const systemStatus = checkSystemFiles();
@@ -43,10 +43,10 @@ app.use(express.static('dist')); // Servir frontend buildado
 
 // CORS para desenvolvimento
 app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  next();
+	res.header('Access-Control-Allow-Origin', '*');
+	res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+	res.header('Access-Control-Allow-Headers', 'Content-Type');
+	next();
 });
 
 /**
@@ -54,31 +54,31 @@ app.use((_req, res, next) => {
  * Com a nova lógica, apenas subdomínios com pais EXISTENTES têm isSubdomain=true
  */
 function groupDomains(vhosts: VirtualHost[]): Domain[] {
-  const domainsMap = new Map<string, Domain>();
+	const domainsMap = new Map<string, Domain>();
 
-  // Primeiro, criar todos os domínios principais
-  for (const vhost of vhosts) {
-    if (!vhost.isSubdomain) {
-      domainsMap.set(vhost.serverName, {
-        name: vhost.serverName,
-        type: vhost.type,
-        mainHost: vhost,
-        subdomains: [],
-      });
-    }
-  }
+	// Primeiro, criar todos os domínios principais
+	for (const vhost of vhosts) {
+		if (!vhost.isSubdomain) {
+			domainsMap.set(vhost.serverName, {
+				name: vhost.serverName,
+				type: vhost.type,
+				mainHost: vhost,
+				subdomains: [],
+			});
+		}
+	}
 
-  // Depois, adicionar subdomínios aos seus pais
-  for (const vhost of vhosts) {
-    if (vhost.isSubdomain && vhost.parentDomain) {
-      const parentDomain = domainsMap.get(vhost.parentDomain);
-      if (parentDomain) {
-        parentDomain.subdomains.push(vhost);
-      }
-    }
-  }
+	// Depois, adicionar subdomínios aos seus pais
+	for (const vhost of vhosts) {
+		if (vhost.isSubdomain && vhost.parentDomain) {
+			const parentDomain = domainsMap.get(vhost.parentDomain);
+			if (parentDomain) {
+				parentDomain.subdomains.push(vhost);
+			}
+		}
+	}
 
-  return Array.from(domainsMap.values());
+	return Array.from(domainsMap.values());
 }
 
 // ============ ROTAS DA API ============
@@ -87,346 +87,346 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
  * GET /api/diagnostics - Retorna informações de diagnóstico do sistema
  */
 app.get('/api/diagnostics', (_req, res) => {
-  const response: ApiResponse<typeof systemStatus> = {
-    success: true,
-    data: {
-      ...systemStatus,
-      server: {
-        ...systemStatus.server,
-        uptime: process.uptime(), // Atualizar uptime
-      },
-    },
-  };
+	const response: ApiResponse<typeof systemStatus> = {
+		success: true,
+		data: {
+			...systemStatus,
+			server: {
+				...systemStatus.server,
+				uptime: process.uptime(), // Atualizar uptime
+			},
+		},
+	};
 
-  console.log('[API /api/diagnostics] Retornando:', {
-    httpExists: systemStatus.apache.httpConfigExists,
-    httpsExists: systemStatus.apache.httpsConfigExists,
-    sslExists: systemStatus.ssl.renewalDirExists,
-  });
+	console.log('[API /api/diagnostics] Retornando:', {
+		httpExists: systemStatus.apache.httpConfigExists,
+		httpsExists: systemStatus.apache.httpsConfigExists,
+		sslExists: systemStatus.ssl.renewalDirExists,
+	});
 
-  res.json(response);
+	res.json(response);
 });
 
 /**
  * GET /api/domains - Lista todos os domínios
  */
 app.get('/api/domains', async (_req, res) => {
-  try {
-    const vhosts = await getAllVirtualHosts();
-    const domains = groupDomains(vhosts);
+	try {
+		const vhosts = await getAllVirtualHosts();
+		const domains = groupDomains(vhosts);
 
-    const response: ApiResponse<Domain[]> = {
-      success: true,
-      data: domains,
-    };
+		const response: ApiResponse<Domain[]> = {
+			success: true,
+			data: domains,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(500).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(500).json(response);
+	}
 });
 
 /**
  * GET /api/vhosts - Lista todos os VirtualHosts (raw)
  */
 app.get('/api/vhosts', async (_req, res) => {
-  try {
-    const vhosts = await getAllVirtualHosts();
+	try {
+		const vhosts = await getAllVirtualHosts();
 
-    const response: ApiResponse<VirtualHost[]> = {
-      success: true,
-      data: vhosts,
-    };
+		const response: ApiResponse<VirtualHost[]> = {
+			success: true,
+			data: vhosts,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(500).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(500).json(response);
+	}
 });
 
 /**
  * POST /api/domains - Adiciona um novo domínio
  */
 app.post('/api/domains', async (req, res) => {
-  try {
-    const dto: CreateDomainDTO = req.body;
+	try {
+		const dto: CreateDomainDTO = req.body;
 
-    await addDomain(dto);
+		await addDomain(dto);
 
-    const response: ApiResponse = {
-      success: true,
-    };
+		const response: ApiResponse = {
+			success: true,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(400).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(400).json(response);
+	}
 });
 
 /**
  * PUT /api/domains/:serverName - Atualiza um domínio
  */
 app.put('/api/domains/:serverName', async (req, res) => {
-  try {
-    const { serverName } = req.params;
-    const dto: UpdateDomainDto = req.body;
+	try {
+		const { serverName } = req.params;
+		const dto: UpdateDomainDto = req.body;
 
-    await updateDomain(serverName, dto);
+		await updateDomain(serverName, dto);
 
-    const response: ApiResponse = {
-      success: true,
-    };
+		const response: ApiResponse = {
+			success: true,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(400).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(400).json(response);
+	}
 });
 
 /**
  * DELETE /api/domains/:serverName - Remove um domínio
  */
 app.delete('/api/domains/:serverName', async (req, res) => {
-  try {
-    const { serverName } = req.params;
+	try {
+		const { serverName } = req.params;
 
-    await removeDomain(serverName);
+		await removeDomain(serverName);
 
-    const response: ApiResponse = {
-      success: true,
-    };
+		const response: ApiResponse = {
+			success: true,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(400).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(400).json(response);
+	}
 });
 
 /**
  * POST /api/ssl/obtain - Obtém certificado SSL
  */
 app.post('/api/ssl/obtain', async (req, res) => {
-  try {
-    const { domain } = req.body;
+	try {
+		const { domain } = req.body;
 
-    await obtainSSL(domain);
+		await obtainSSL(domain);
 
-    const response: ApiResponse = {
-      success: true,
-    };
+		const response: ApiResponse = {
+			success: true,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(400).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(400).json(response);
+	}
 });
 
 /**
  * POST /api/ssl/renew - Renova certificado SSL
  */
 app.post('/api/ssl/renew', async (req, res) => {
-  try {
-    const { domain } = req.body;
+	try {
+		const { domain } = req.body;
 
-    await renewSSL(domain);
+		await renewSSL(domain);
 
-    const response: ApiResponse = {
-      success: true,
-    };
+		const response: ApiResponse = {
+			success: true,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(400).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(400).json(response);
+	}
 });
 
 /**
  * GET /api/config/download/:type - Download de arquivos de configuração
  */
 app.get('/api/config/download/:type', (req, res) => {
-  try {
-    const { type } = req.params;
+	try {
+		const { type } = req.params;
 
-    let filePath: string;
-    let fileName: string;
+		let filePath: string;
+		let fileName: string;
 
-    switch (type) {
-      case 'http':
-        filePath = '/etc/httpd/conf.d/vhost.conf';
-        fileName = 'vhost.conf';
-        break;
-      case 'https':
-        filePath = '/etc/httpd/conf.d/vhost-le-ssl.conf';
-        fileName = 'vhost-le-ssl.conf';
-        break;
-      default:
-        return res.status(400).json({ success: false, error: 'Tipo inválido' });
-    }
+		switch (type) {
+			case 'http':
+				filePath = '/etc/httpd/conf.d/vhost.conf';
+				fileName = 'vhost.conf';
+				break;
+			case 'https':
+				filePath = '/etc/httpd/conf.d/vhost-le-ssl.conf';
+				fileName = 'vhost-le-ssl.conf';
+				break;
+			default:
+				return res.status(400).json({ success: false, error: 'Tipo inválido' });
+		}
 
-    if (!existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: 'Arquivo não encontrado' });
-    }
+		if (!existsSync(filePath)) {
+			return res.status(404).json({ success: false, error: 'Arquivo não encontrado' });
+		}
 
-    const content = readFileSync(filePath, 'utf-8');
+		const content = readFileSync(filePath, 'utf-8');
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(content);
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+		res.setHeader('Content-Type', 'text/plain');
+		res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+		res.send(content);
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message });
+	}
 });
 
 /**
  * POST /api/config/upload/:type - Upload de arquivos de configuração com validação
  */
 app.post('/api/config/upload/:type', async (req, res) => {
-  try {
-    const { type } = req.params;
-    const { content } = req.body;
+	try {
+		const { type } = req.params;
+		const { content } = req.body;
 
-    if (!content || typeof content !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'Conteúdo do arquivo é obrigatório'
-      });
-    }
+		if (!content || typeof content !== 'string') {
+			return res.status(400).json({
+				success: false,
+				error: 'Conteúdo do arquivo é obrigatório'
+			});
+		}
 
-    if (type !== 'http' && type !== 'https') {
-      return res.status(400).json({
-        success: false,
-        error: 'Tipo inválido. Use "http" ou "https"'
-      });
-    }
+		if (type !== 'http' && type !== 'https') {
+			return res.status(400).json({
+				success: false,
+				error: 'Tipo inválido. Use "http" ou "https"'
+			});
+		}
 
-    // Substituir arquivo com validação
-    const result = await replaceConfigFile(type as 'http' | 'https', content);
+		// Substituir arquivo com validação
+		const result = await replaceConfigFile(type as 'http' | 'https', content);
 
-    const response: ApiResponse = {
-      success: true,
-      data: result,
-    };
+		const response: ApiResponse = {
+			success: true,
+			data: result,
+		};
 
-    res.json(response);
-  } catch (error: any) {
-    const response: ApiResponse = {
-      success: false,
-      error: error.message,
-    };
-    res.status(400).json(response);
-  }
+		res.json(response);
+	} catch (error: any) {
+		const response: ApiResponse = {
+			success: false,
+			error: error.message,
+		};
+		res.status(400).json(response);
+	}
 });
 
 /**
  * GET /api/logs - Retorna todos os logs armazenados
  */
 app.get('/api/logs', (_req, res) => {
-  const logs = getAllLogs();
-  const response: ApiResponse<LogEntry[]> = {
-    success: true,
-    data: logs,
-  };
-  res.json(response);
+	const logs = getAllLogs();
+	const response: ApiResponse<LogEntry[]> = {
+		success: true,
+		data: logs,
+	};
+	res.json(response);
 });
 
 /**
  * DELETE /api/logs - Limpa todos os logs
  */
 app.delete('/api/logs', (_req, res) => {
-  clearLogs();
-  const response: ApiResponse = {
-    success: true,
-  };
-  res.json(response);
+	clearLogs();
+	const response: ApiResponse = {
+		success: true,
+	};
+	res.json(response);
 });
 
 /**
  * GET /api/logs/stream - Server-Sent Events para logs em tempo real
  */
 app.get('/api/logs/stream', (req, res) => {
-  // Configurar SSE
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+	// Configurar SSE
+	res.setHeader('Content-Type', 'text/event-stream');
+	res.setHeader('Cache-Control', 'no-cache');
+	res.setHeader('Connection', 'keep-alive');
+	res.setHeader('Access-Control-Allow-Origin', '*');
 
-  // Enviar logs existentes imediatamente
-  const existingLogs = getAllLogs();
-  res.write(`data: ${JSON.stringify({ type: 'init', logs: existingLogs })}\n\n`);
+	// Enviar logs existentes imediatamente
+	const existingLogs = getAllLogs();
+	res.write(`data: ${JSON.stringify({ type: 'init', logs: existingLogs })}\n\n`);
 
-  // Criar listener para novos logs
-  const listener = (entry: LogEntry) => {
-    res.write(`data: ${JSON.stringify({ type: 'log', log: entry })}\n\n`);
-  };
+	// Criar listener para novos logs
+	const listener = (entry: LogEntry) => {
+		res.write(`data: ${JSON.stringify({ type: 'log', log: entry })}\n\n`);
+	};
 
-  // Adicionar listener
-  addLogListener(listener);
+	// Adicionar listener
+	addLogListener(listener);
 
-  // Remover listener quando a conexão fechar
-  req.on('close', () => {
-    removeLogListener(listener);
-    res.end();
-  });
+	// Remover listener quando a conexão fechar
+	req.on('close', () => {
+		removeLogListener(listener);
+		res.end();
+	});
 });
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
-  console.log('');
+	console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);
+	console.log('');
 
-  const { apache, ssl } = systemStatus;
+	const { apache, ssl } = systemStatus;
 
-  if (!apache.httpConfigExists && !apache.httpsConfigExists) {
-    console.log('⛔ ERRO: Nenhum arquivo de configuração Apache encontrado!');
-    console.log(`   Procurado: ${apache.httpConfigPath}`);
-    console.log(`   Procurado: ${apache.httpsConfigPath}`);
-  } else {
-    if (!apache.httpConfigExists) {
-      console.log(`⚠️  AVISO: ${apache.httpConfigPath} não encontrado`);
-    } else {
-      console.log(`✅ ${apache.httpConfigPath} encontrado`);
-    }
+	if (!apache.httpConfigExists && !apache.httpsConfigExists) {
+		console.log('⛔ ERRO: Nenhum arquivo de configuração Apache encontrado!');
+		console.log(`   Procurado: ${apache.httpConfigPath}`);
+		console.log(`   Procurado: ${apache.httpsConfigPath}`);
+	} else {
+		if (!apache.httpConfigExists) {
+			console.log(`⚠️  AVISO: ${apache.httpConfigPath} não encontrado`);
+		} else {
+			console.log(`✅ ${apache.httpConfigPath} encontrado`);
+		}
 
-    if (!apache.httpsConfigExists) {
-      console.log(`⚠️  AVISO: ${apache.httpsConfigPath} não encontrado`);
-    } else {
-      console.log(`✅ ${apache.httpsConfigPath} encontrado`);
-    }
-  }
+		if (!apache.httpsConfigExists) {
+			console.log(`⚠️  AVISO: ${apache.httpsConfigPath} não encontrado`);
+		} else {
+			console.log(`✅ ${apache.httpsConfigPath} encontrado`);
+		}
+	}
 
-  if (!ssl.renewalDirExists) {
-    console.log(`⚠️  AVISO: ${ssl.renewalDirPath} não encontrado (SSL não configurado)`);
-  } else {
-    console.log(`✅ ${ssl.renewalDirPath} encontrado`);
-  }
+	if (!ssl.renewalDirExists) {
+		console.log(`⚠️  AVISO: ${ssl.renewalDirPath} não encontrado (SSL não configurado)`);
+	} else {
+		console.log(`✅ ${ssl.renewalDirPath} encontrado`);
+	}
 
-  console.log('');
+	console.log('');
 });

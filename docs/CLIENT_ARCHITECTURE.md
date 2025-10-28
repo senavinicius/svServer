@@ -36,6 +36,7 @@ src/client/
 - Estado centralizado para facilitar debugging
 - Handlers extraídos para funções nomeadas
 - Uso de mapa de ações ao invés de múltiplos ifs/switches
+- Seletores/DOM centralizados via helpers de `src/client/dom.ts`
 
 ### render.ts
 **Responsabilidade**: Renderização de componentes UI
@@ -75,10 +76,12 @@ const SSL_STATUS_CONFIG = {
 Fornece funções auxiliares com type-safety:
 - `getElement()`: Obtém elemento ou lança erro
 - `queryElement()`: Obtém elemento ou retorna null
-- `addEventListener()`: Adiciona listener com verificação
-- Helpers para classes, valores de inputs, etc.
+- `addEventListener()`: Adiciona listener com verificação por ID
+- `addDataAttributeListeners()`: Binda handlers em lotes via data-attributes
+- `toggleClass()`: Alterna classes com suporte a `force`
+- Helpers para valores de inputs, `FormData`, etc.
 
-**Nota**: Atualmente não está sendo usado extensivamente, mas está disponível para expansão futura.
+**Uso atual**: `main.ts` consome esses helpers para montar listeners (botões, formulários, ações dos cards) e alternar grupos de campos do modal com type-safety.
 
 ### api.ts
 **Responsabilidade**: Comunicação com backend
