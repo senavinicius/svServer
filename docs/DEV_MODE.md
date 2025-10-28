@@ -14,6 +14,7 @@ Todos os comandos operam diretamente nos arquivos reais (`/etc/httpd/conf.d`, `/
 
 ## Diagnóstico rápido
 - Logs em tempo real: saída do `npm run dev:server`.
+- Painel de logs no dashboard: `/api/logs/stream` alimenta o SSE usado no frontend para exibir as últimas 500 entradas (toggle e clear disponíveis na UI).
 - Endpoint `/api/diagnostics`: mostra estado lido na inicialização (arquivos locais, versão do Node, etc.).
 - Após editar configs, confirme com `apachectl configtest` (já executado pelo backend antes de recarregar).
 

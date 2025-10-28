@@ -34,6 +34,11 @@ Dashboard web para gerenciar Apache e Certbot no próprio servidor EC2 t4g.small
 - PHP legado apenas listado (sem edição/remoção)
 - Certificados existentes permanecem nos diretórios do Certbot; execute `sudo certbot delete --cert-name <domínio>` manualmente se precisar removê-los
 
+✅ **Logs em Tempo Real**
+- Consolida todas as operações sensíveis (Apache, Certbot, filesystem)
+- Exibe painel ao vivo no frontend com Server-Sent Events
+- Permite limpar histórico diretamente pela UI ou endpoint dedicado
+
 ## Docs
 
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Stack e estrutura
@@ -147,6 +152,15 @@ O código do cliente está organizado em módulos especializados:
 ### SSL
 - `POST /api/ssl/obtain` - Obtém certificado SSL
 - `POST /api/ssl/renew` - Renova certificado SSL
+
+### Config
+- `POST /api/config/upload/:type` - Substitui `vhost.conf` ou `vhost-le-ssl.conf` com validação e reload automático
+- `GET /api/config/download/:type` - Download dos arquivos atuais de configuração
+
+### Logs
+- `GET /api/logs` - Lista os últimos 500 registros em memória
+- `DELETE /api/logs` - Limpa o buffer de logs
+- `GET /api/logs/stream` - Stream SSE para acompanhar logs em tempo real no navegador
 
 ## Filosofia
 

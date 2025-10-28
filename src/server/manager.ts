@@ -295,29 +295,48 @@ export async function removeDomain(serverName: string): Promise<void> {
     const content = readFileSync(filePath, 'utf-8');
     logger.debug('removeFromFile', `Lendo arquivo: ${filePath}`, { contentLength: content.length });
 
-    // REGEX CORRIGIDA: Usar non-greedy match e garantir que ServerName é exato
-    // A regex anterior era muito gulosa e podia capturar múltiplos VirtualHosts
-    // (?:\s|$) = espaço OU fim de linha (para pegar ServerName no final da linha)
-    const vhostRegex = new RegExp(
-      `<VirtualHost[^>]*>\\s*?[\\s\\S]*?ServerName\\s+${sanitizedName}(?:\\s|$)[\\s\\S]*?<\\/VirtualHost>\\s*?`,
-      'gm'
-    );
+    const blockRegex = /<VirtualHost[^>]*>[\s\S]*?<\/VirtualHost>/gi;
+    const serverNameRegex = new RegExp(`^\\s*ServerName\\s+${sanitizedName}(?:\\s|$)`, 'im');
 
-    logger.debug('removeFromFile', 'Regex pattern', { pattern: vhostRegex.source });
+    logger.debug('removeFromFile', 'Regex pattern', {
+      blockPattern: blockRegex.source,
+      serverNamePattern: serverNameRegex.source,
+    });
 
-    // Encontrar todos os matches ANTES de remover (para logging)
-    const matches = content.match(vhostRegex);
-    if (matches) {
-      logger.info('removeFromFile', `Encontrado ${matches.length} bloco(s) VirtualHost para remover`, {
+    const blocksToRemove: Array<{ block: string; start: number; end: number }> = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = blockRegex.exec(content)) !== null) {
+      const block = match[0];
+      if (serverNameRegex.test(block)) {
+        blocksToRemove.push({
+          block,
+          start: match.index,
+          end: match.index + block.length,
+        });
+      }
+    }
+
+    if (blocksToRemove.length > 0) {
+      logger.info('removeFromFile', `Encontrado ${blocksToRemove.length} bloco(s) VirtualHost para remover`, {
         filePath,
-        matches: matches.map(m => ({
-          preview: m.substring(0, 200) + '...',
-          length: m.length,
+        matches: blocksToRemove.map(({ block }) => ({
+          preview: block.substring(0, 200) + '...',
+          length: block.length,
         })),
       });
     }
 
-    const newContent = content.replace(vhostRegex, '');
+    let cursor = 0;
+    const newContentParts: string[] = [];
+
+    for (const { start, end } of blocksToRemove) {
+      newContentParts.push(content.slice(cursor, start));
+      cursor = end;
+    }
+    newContentParts.push(content.slice(cursor));
+
+    const newContent = newContentParts.join('');
 
     if (newContent !== content) {
       // Log da operação de arquivo
@@ -506,6 +525,27 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
   const filePath = type === 'http' ? VHOST_HTTP_PATH : VHOST_HTTPS_PATH;
   const backupPath = `${filePath}.backup.${Date.now()}`;
   const tempPath = `/tmp/vhost-upload-${Date.now()}.conf`;
+  const normalizedIncoming = content.replace(/\r\n/g, '\n');
+  let previousContent: string | null = null;
+  let normalizedPrevious: string | null = null;
+
+  // Se o arquivo atual já existe, compara conteúdo para evitar trabalho desnecessário
+  if (existsSync(filePath)) {
+    try {
+      previousContent = readFileSync(filePath, 'utf-8');
+      normalizedPrevious = previousContent.replace(/\r\n/g, '\n');
+
+      if (normalizedPrevious === normalizedIncoming) {
+        logger.info('replaceConfigFile', 'Upload ignorado: conteúdo idêntico ao arquivo existente', { filePath });
+        return {
+          message: 'Nenhuma alteração detectada; arquivo mantido como está.',
+          validationOutput: 'Upload ignorado porque o conteúdo é idêntico ao arquivo atual.',
+        };
+      }
+    } catch (error) {
+      logger.warn('replaceConfigFile', 'Não foi possível ler arquivo atual para comparação', { error });
+    }
+  }
 
   // Validação básica: verificar se contém tags VirtualHost
   if (!content.includes('<VirtualHost') || !content.includes('</VirtualHost>')) {
@@ -539,6 +579,7 @@ export async function replaceConfigFile(type: 'http' | 'https', content: string)
     await execCommand(`sudo cp ${tempPath} ${filePath}`);
     await execCommand(`sudo chmod 644 ${filePath}`);
     logger.info('replaceConfigFile', `Arquivo copiado para: ${filePath}`);
+    logger.fileOperation('replaceConfigFile', filePath, previousContent ?? '', content);
   } catch (error) {
     // Limpar arquivo temporário
     try { await execCommand(`rm -f ${tempPath}`); } catch {}

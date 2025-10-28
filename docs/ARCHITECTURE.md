@@ -31,6 +31,12 @@ src/
 - **Frontend ↔ Backend**: REST API (fetch)
 - **Backend ↔ Sistema**: child_process.exec/spawn + fs
 
+## Observabilidade
+
+- Logger em memória (`src/server/logger.ts`) concentra operações sensíveis com níveis DEBUG/INFO/WARN/ERROR.
+- Históricos ficam limitados a 500 entradas e são transmitidos via Server-Sent Events (`/api/logs/stream`).
+- UI consome o stream para painel em tempo real; APIs REST permitem listar (`GET /api/logs`) e limpar (`DELETE /api/logs`) o buffer.
+
 ## Servidor
 
 - **OS**: Amazon Linux 2023

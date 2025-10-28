@@ -20,6 +20,23 @@
 - **Renewal**: `/etc/letsencrypt/renewal/<domain>.conf`
 - **Comando**: `sudo certbot --apache -d <domain>`
 
+**IMPORTANTE - Permissões do Let's Encrypt:**
+
+Por padrão, os diretórios do Let's Encrypt são 700 (apenas root pode ler).
+Isso impede o Apache de ler os certificados quando roda como usuário não-root.
+
+**Corrigir permissões (necessário após instalar certbot):**
+```bash
+sudo chmod 711 /etc/letsencrypt/live
+sudo chmod 711 /etc/letsencrypt/archive
+```
+
+**Explicação:**
+- `711` = Owner (root) tem acesso total, outros podem **executar** (entrar no diretório)
+- Isso permite que Apache leia os certificados dentro, mas não liste o conteúdo
+- Os arquivos de certificado dentro mantêm suas permissões seguras (644)
+- **Sintoma se não configurar:** `apachectl configtest` falha com "SSLCertificateFile: file does not exist or is empty"
+
 ### Sudoers (configuração necessária)
 
 **Criar/editar arquivo de sudoers do ec2-user:**
@@ -73,3 +90,39 @@ Exemplo:
 - `blog.example.com` → `/webapp/blog/`
 
 O gerenciador **lê e edita** o `DocumentRoot` de cada VirtualHost.
+
+---
+
+## Troubleshooting
+
+### Erro: "SSLCertificateFile: file does not exist or is empty"
+
+**Sintoma:** `apachectl configtest` falha dizendo que certificado SSL não existe, mas o arquivo existe.
+
+**Causa:** Diretórios do Let's Encrypt com permissões 700 (apenas root pode ler).
+
+**Solução:**
+```bash
+sudo chmod 711 /etc/letsencrypt/live
+sudo chmod 711 /etc/letsencrypt/archive
+```
+
+**Verificar se resolveu:**
+```bash
+sudo -u apache test -r /etc/letsencrypt/live/seu-dominio.com/fullchain.pem && echo "OK" || echo "NEGADO"
+```
+
+### Erro: "sudo: sorry, user ec2-user is not allowed to execute..."
+
+**Sintoma:** Comandos com sudo falham no Node.js.
+
+**Causa:** Sudoers não configurado ou incompleto.
+
+**Solução:** Verifique se todas as linhas do sudoers estão configuradas (veja seção "Sudoers" acima).
+
+**Verificar:**
+```bash
+sudo -l
+```
+
+Deve listar todos os comandos: systemctl, certbot, apachectl, cp, chmod, test, ln, rm, mv.

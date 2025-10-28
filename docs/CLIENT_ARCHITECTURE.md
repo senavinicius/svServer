@@ -30,6 +30,7 @@ src/client/
 - **Renderização**: Função `render()` que atualiza toda UI
 - **Event Handlers**: Funções para manipular eventos do usuário
 - **Mapa de Ações**: Objeto `DOMAIN_ACTIONS` que mapeia ações para funções
+- **Logging**: abre conexão SSE (`/api/logs/stream`), atualiza `state.logs` e expõe handlers para toggle/clear
 
 **Padrões aplicados**:
 - Estado centralizado para facilitar debugging
@@ -66,6 +67,7 @@ const SSL_STATUS_CONFIG = {
 - `renderVirtualHost()`: Renderiza um domínio/subdomínio
 - `renderModal()`: Renderiza modal de adicionar/editar
 - `renderSystemStatus()`: Exibe avisos do sistema
+- `renderLogsPanel()`: Estrutura painel com histórico + ações de limpeza
 
 ### dom.ts
 **Responsabilidade**: Utilitários type-safe para manipulação DOM
@@ -97,6 +99,7 @@ Fornece funções auxiliares com type-safety:
 6. **Modal e Formulários**: Estilos de modal e inputs
 7. **Estados e Mensagens**: Loading, erro, empty state
 8. **Diagnósticos**: Painéis de status do sistema
+9. **Logs**: Layout do painel em tempo real (scroll customizado, header, botões)
 
 **Variáveis CSS**:
 ```css
