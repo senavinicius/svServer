@@ -57,7 +57,17 @@ export function clearLogs(): void {
  * Formata uma entrada de log para console
  */
 function formatLogEntry(entry: LogEntry): string {
-  const dataStr = entry.data ? `\n  Data: ${JSON.stringify(entry.data, null, 2)}` : '';
+  let dataStr = '';
+
+  if (entry.data) {
+    // Se tem uma chave 'blocoCompleto', exibir de forma legível
+    if (entry.data.blocoCompleto && typeof entry.data.blocoCompleto === 'string') {
+      dataStr = `\n${'='.repeat(80)}\n${entry.data.blocoCompleto}\n${'='.repeat(80)}`;
+    } else {
+      dataStr = `\n  Data: ${JSON.stringify(entry.data, null, 2)}`;
+    }
+  }
+
   return `[${entry.timestamp}] [${entry.level}] [${entry.operation}] ${entry.message}${dataStr}`;
 }
 
