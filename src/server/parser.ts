@@ -36,9 +36,7 @@ export function parseApacheConfig(configPath: string): VirtualHost[] {
     // Se não há ServerName, pula
     if (!block.serverName) {
       logger.warn('parseApacheConfig', 'Bloco VirtualHost descartado (sem ServerName)', {
-        directives: Array.from(block.directives.keys()),
-        allDirectiveValues: Object.fromEntries(block.directives),
-        rawConfigPreview: block.rawConfig.substring(0, 300)
+        blocoCompleto: block.rawConfig
       });
       continue;
     }
