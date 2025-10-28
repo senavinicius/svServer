@@ -24,69 +24,30 @@ interface ParsedVHostBlock {
  */
 export function parseApacheConfig(configPath: string): VirtualHost[] {
   if (!existsSync(configPath)) {
-    logger.warn('parseApacheConfig', `Arquivo não encontrado: ${configPath}`);
     return [];
   }
 
   const content = readFileSync(configPath, 'utf-8');
   const blocks = extractVirtualHostBlocks(content);
-
-  logger.info('parseApacheConfig',
-    `Iniciando parse: ${configPath}`,
-    {
-      fileSize: content.length,
-      totalBlocks: blocks.length,
-      filePath: configPath
-    }
-  );
-
   const vhosts: VirtualHost[] = [];
 
   // Criar VirtualHosts "crus" sem classificação de subdomínio
   for (const block of blocks) {
     // Se não há ServerName, pula
     if (!block.serverName) {
-      const directivesFound = Array.from(block.directives.keys());
-      const directiveValues = Object.fromEntries(block.directives);
-      const configPreview = block.rawConfig.substring(0, 500);
-
-      logger.warn('parseApacheConfig',
-        `Bloco VirtualHost descartado: sem ServerName encontrado. Diretivas presentes: ${directivesFound.join(', ') || 'NENHUMA'}`,
-        {
-          totalDirectives: directivesFound.length,
-          directives: directivesFound,
-          directiveValues,
-          configPreview,
-          configLength: block.rawConfig.length
-        }
-      );
+      logger.warn('parseApacheConfig', 'Bloco VirtualHost descartado (sem ServerName)', {
+        directives: Array.from(block.directives.keys()),
+        allDirectiveValues: Object.fromEntries(block.directives),
+        rawConfigPreview: block.rawConfig.substring(0, 300)
+      });
       continue;
     }
 
     const vhost = createVirtualHost(block);
     if (vhost) {
       vhosts.push(vhost);
-      logger.debug('parseApacheConfig',
-        `VirtualHost criado: ${vhost.serverName}`,
-        {
-          serverName: vhost.serverName,
-          type: vhost.type,
-          port: vhost.port,
-          hasAliases: !!vhost.serverAliases,
-          aliasCount: vhost.serverAliases?.length || 0
-        }
-      );
     }
   }
-
-  logger.info('parseApacheConfig',
-    `Parse concluído: ${configPath}`,
-    {
-      totalVhosts: vhosts.length,
-      blocksProcessed: blocks.length,
-      blocksDiscarded: blocks.length - vhosts.length
-    }
-  );
 
   return vhosts;
 }
@@ -231,17 +192,6 @@ function extractDomains(directives: Map<string, string[]>): {
   // ServerName (apenas 1, é obrigatório)
   const serverNames = directives.get('servername') || [];
   const serverName = serverNames.length > 0 ? serverNames[0] : '';
-
-  if (!serverName) {
-    logger.debug('extractDomains',
-      'ServerName não encontrado ou vazio',
-      {
-        hasServerNameDirective: directives.has('servername'),
-        serverNamesArray: serverNames,
-        allDirectives: Array.from(directives.keys())
-      }
-    );
-  }
 
   // ServerAlias (pode ter múltiplos, separados por espaço em uma ou mais linhas)
   const serverAliases: string[] = [];
