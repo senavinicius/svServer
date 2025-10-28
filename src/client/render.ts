@@ -289,7 +289,16 @@ export function renderLogsPanel(logs: LogEntry[]): string {
 function renderLogEntry(log: LogEntry): string {
 	const levelClass = `log-${log.level.toLowerCase()}`;
 	const time = new Date(log.timestamp).toLocaleTimeString('pt-BR');
-	const dataStr = log.data ? `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>` : '';
+
+	let dataStr = '';
+	if (log.data) {
+		// Se tem rawConfig, exibir em <pre> para preservar formatação
+		if (log.data.rawConfig && typeof log.data.rawConfig === 'string') {
+			dataStr = `<pre class="log-rawconfig">${escapeHtml(log.data.rawConfig)}</pre>`;
+		} else {
+			dataStr = `<div class="log-data">${JSON.stringify(log.data, null, 2)}</div>`;
+		}
+	}
 
 	return `
     <div class="log-entry ${levelClass}">
