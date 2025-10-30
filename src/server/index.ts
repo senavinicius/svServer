@@ -57,32 +57,19 @@ const authConfig = {
 	secret: process.env.AUTH_SECRET || '',
 };
 
-// Rotas de autenticação (opcional - mas recomendado para produção)
-let auth: ReturnType<typeof createAuthMiddleware>;
-
-if (authConfig.googleClientId && authConfig.googleClientSecret && authConfig.secret) {
-	try {
-		app.use('/auth/*', createAuthRoutes(authConfig));
-		auth = createAuthMiddleware();
-		logger.info('AUTH', 'Autenticação Google OAuth habilitada');
-		console.log('✅ Autenticação Google OAuth habilitada');
-	} catch (error: any) {
-		logger.error('AUTH', 'Erro ao configurar autenticação', { error: error.message });
-		// Criar mock para não quebrar o servidor
-		auth = {
-			require: () => (_req: any, _res: any, next: any) => next(),
-			optional: () => (_req: any, _res: any, next: any) => next(),
-		} as any;
-	}
-} else {
-	logger.warn('AUTH', 'Autenticação desabilitada - Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e AUTH_SECRET para habilitar');
-	console.log('⚠️  Autenticação desabilitada - servidor rodando sem proteção');
-	// Mock auth para permitir servidor rodar sem autenticação
-	auth = {
-		require: () => (_req: any, _res: any, next: any) => next(),
-		optional: () => (_req: any, _res: any, next: any) => next(),
-	} as any;
+// Rotas de autenticação (OBRIGATÓRIO para este projeto)
+if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.secret) {
+	logger.error('AUTH', 'Variáveis de autenticação não configuradas! Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e AUTH_SECRET');
+	console.error('❌ ERRO: Configure as variáveis de autenticação no .env');
+	console.error('   O servidor vai iniciar mas todas as rotas vão retornar 401 Unauthorized');
 }
+
+// Sempre inicializar auth (mesmo que dê erro, para não quebrar o servidor)
+app.use('/auth/*', createAuthRoutes(authConfig));
+const auth = createAuthMiddleware();
+
+logger.info('AUTH', 'Sistema de autenticação inicializado');
+console.log('✅ Sistema de autenticação inicializado');
 
 /**
  * Agrupa VirtualHosts em domínios principais e subdomínios
