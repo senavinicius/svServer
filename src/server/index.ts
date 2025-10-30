@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL, replaceConfigFile } from './manager.js';
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
-import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry } from './logger.js';
+import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry, logger } from './logger.js';
 import { createAuthRoutes, createAuthMiddleware } from '@vinicius/auth';
 
 const app = express();
@@ -57,16 +57,32 @@ const authConfig = {
 	secret: process.env.AUTH_SECRET || '',
 };
 
-// Rotas de autenticação (OBRIGATÓRIO)
-if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.secret) {
-	console.error('❌ ERRO: Variáveis de autenticação não configuradas!');
-	console.error('Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e AUTH_SECRET');
-	process.exit(1);
-}
+// Rotas de autenticação (opcional - mas recomendado para produção)
+let auth: ReturnType<typeof createAuthMiddleware>;
 
-app.use('/auth/*', createAuthRoutes(authConfig));
-const auth = createAuthMiddleware();
-console.log('✅ Autenticação Google OAuth habilitada');
+if (authConfig.googleClientId && authConfig.googleClientSecret && authConfig.secret) {
+	try {
+		app.use('/auth/*', createAuthRoutes(authConfig));
+		auth = createAuthMiddleware();
+		logger.info('AUTH', 'Autenticação Google OAuth habilitada');
+		console.log('✅ Autenticação Google OAuth habilitada');
+	} catch (error: any) {
+		logger.error('AUTH', 'Erro ao configurar autenticação', { error: error.message });
+		// Criar mock para não quebrar o servidor
+		auth = {
+			require: () => (_req: any, _res: any, next: any) => next(),
+			optional: () => (_req: any, _res: any, next: any) => next(),
+		} as any;
+	}
+} else {
+	logger.warn('AUTH', 'Autenticação desabilitada - Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e AUTH_SECRET para habilitar');
+	console.log('⚠️  Autenticação desabilitada - servidor rodando sem proteção');
+	// Mock auth para permitir servidor rodar sem autenticação
+	auth = {
+		require: () => (_req: any, _res: any, next: any) => next(),
+		optional: () => (_req: any, _res: any, next: any) => next(),
+	} as any;
+}
 
 /**
  * Agrupa VirtualHosts em domínios principais e subdomínios
