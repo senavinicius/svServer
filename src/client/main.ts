@@ -36,7 +36,7 @@ function render() {
             <h1>EC2 Manager</h1>
             <p>Gerenciador de domínios Apache e SSL (Certbot)</p>
           </div>
-          <a href="/auth/signin/google" class="btn btn-primary">🔐 Login com Google</a>
+          <button class="btn btn-primary" id="login-btn" type="button">🔐 Login com Google</button>
         </div>
       </div>
 
@@ -74,6 +74,7 @@ function render() {
  */
 function attachEventListeners() {
 	addEventListener('add-domain-btn', 'click', openAddModal);
+	addEventListener('login-btn', 'click', handleLoginClick);
 	addEventListener('cancel-btn', 'click', closeModal);
 	addEventListener('modal', 'click', handleModalBackdropClick);
 	addEventListener('domain-form', 'submit', handleFormSubmit);
@@ -86,6 +87,50 @@ function attachEventListeners() {
 
 	// Ações dos domínios (delegação de eventos)
 	addDataAttributeListeners('data-action', 'click', handleDomainAction);
+}
+
+/**
+ * Inicia fluxo de login com Google via Auth.js
+ * Força POST com CSRF token para /auth/signin/google
+ */
+async function handleLoginClick() {
+	try {
+		const csrfResponse = await fetch('/auth/csrf', {
+			headers: { 'accept': 'application/json' },
+		});
+
+		if (!csrfResponse.ok) {
+			throw new Error('Falha ao obter token CSRF');
+		}
+
+		const { csrfToken } = await csrfResponse.json();
+		if (!csrfToken) {
+			throw new Error('Token CSRF inválido');
+		}
+
+		// Monta form dinâmico para preservar redirecionamento automático
+		const form = document.createElement('form');
+		form.method = 'POST';
+		form.action = '/auth/signin/google';
+		form.style.display = 'none';
+
+		const csrfInput = document.createElement('input');
+		csrfInput.type = 'hidden';
+		csrfInput.name = 'csrfToken';
+		csrfInput.value = csrfToken;
+		form.appendChild(csrfInput);
+
+		const callbackInput = document.createElement('input');
+		callbackInput.type = 'hidden';
+		callbackInput.name = 'callbackUrl';
+		callbackInput.value = window.location.href;
+		form.appendChild(callbackInput);
+
+		document.body.appendChild(form);
+		form.submit();
+	} catch (error: any) {
+		alert(error?.message ?? 'Erro ao iniciar login com Google');
+	}
 }
 
 /**
