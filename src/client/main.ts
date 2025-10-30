@@ -31,8 +31,13 @@ function render() {
 	app.innerHTML = `
     <div class="container">
       <div class="header">
-        <h1>EC2 Manager</h1>
-        <p>Gerenciador de domínios Apache e SSL (Certbot)</p>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1>EC2 Manager</h1>
+            <p>Gerenciador de domínios Apache e SSL (Certbot)</p>
+          </div>
+          <a href="/auth/signin/google" class="btn btn-primary">🔐 Login com Google</a>
+        </div>
       </div>
 
       ${renderSystemStatus(state.diagnostics)}

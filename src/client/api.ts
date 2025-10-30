@@ -15,12 +15,6 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
     },
   });
 
-  // Se não autenticado, redirecionar para login
-  if (response.status === 401) {
-    window.location.href = '/auth/signin/google';
-    throw new Error('Não autenticado');
-  }
-
   const data: ApiResponse<T> = await response.json();
 
   if (!data.success) {
