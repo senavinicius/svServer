@@ -57,16 +57,22 @@ const authConfig = {
 	secret: process.env.AUTH_SECRET || '',
 };
 
+// Middleware de proteção
+let auth: ReturnType<typeof createAuthMiddleware>;
+
 // Rotas de autenticação (signin, callback, session, signout)
 if (authConfig.googleClientId && authConfig.googleClientSecret && authConfig.secret) {
 	app.use('/auth/*', createAuthRoutes(authConfig));
+	auth = createAuthMiddleware();
 	console.log('✅ Autenticação Google OAuth habilitada');
 } else {
+	// Mock auth para desenvolvimento sem OAuth configurado
+	auth = {
+		require: () => (_req: any, _res: any, next: any) => next(),
+		optional: () => (_req: any, _res: any, next: any) => next(),
+	} as any;
 	console.log('⚠️  Autenticação desabilitada (configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET)');
 }
-
-// Middleware de proteção (use auth.require() ou auth.optional())
-const auth = createAuthMiddleware();
 
 /**
  * Agrupa VirtualHosts em domínios principais e subdomínios
