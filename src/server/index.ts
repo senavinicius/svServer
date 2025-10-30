@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { existsSync, readFileSync } from 'fs';
 import { getAllVirtualHosts } from './parser.js';
@@ -65,7 +66,7 @@ if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.
 }
 
 // Sempre inicializar auth (mesmo que dê erro, para não quebrar o servidor)
-app.use('/auth/*', createAuthRoutes(authConfig));
+app.use('/auth', createAuthRoutes(authConfig));
 const auth = createAuthMiddleware();
 
 logger.info('AUTH', 'Sistema de autenticação inicializado');
