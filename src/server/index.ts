@@ -7,6 +7,17 @@ import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost
 import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry, logger } from './logger.js';
 import { createAuthRoutes, createAuthMiddleware } from '@vinicius/auth';
 
+// Global error handlers para debug
+process.on('uncaughtException', (error) => {
+	console.error('❌ UNCAUGHT EXCEPTION:', error);
+	logger.error('SYSTEM', 'Uncaught exception', { error: error.message, stack: error.stack });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+	console.error('❌ UNHANDLED REJECTION:', reason);
+	logger.error('SYSTEM', 'Unhandled rejection', { reason, promise });
+});
+
 const app = express();
 const PORT = process.env.PORT || 3100;
 
