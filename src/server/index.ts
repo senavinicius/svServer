@@ -4,6 +4,7 @@ import { getAllVirtualHosts } from './parser.js';
 import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL, replaceConfigFile } from './manager.js';
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
 import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry } from './logger.js';
+import { createAuthRoutes, createAuthMiddleware } from '@vinicius/auth';
 
 const app = express();
 const PORT = process.env.PORT || 3100;
@@ -49,6 +50,24 @@ app.use((_req, res, next) => {
 	next();
 });
 
+// Configuração de autenticação
+const authConfig = {
+	googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+	googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+	secret: process.env.AUTH_SECRET || '',
+};
+
+// Rotas de autenticação (signin, callback, session, signout)
+if (authConfig.googleClientId && authConfig.googleClientSecret && authConfig.secret) {
+	app.use('/auth/*', createAuthRoutes(authConfig));
+	console.log('✅ Autenticação Google OAuth habilitada');
+} else {
+	console.log('⚠️  Autenticação desabilitada (configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET)');
+}
+
+// Middleware de proteção (use auth.require() ou auth.optional())
+const auth = createAuthMiddleware();
+
 /**
  * Agrupa VirtualHosts em domínios principais e subdomínios
  * Com a nova lógica, apenas subdomínios com pais EXISTENTES têm isSubdomain=true
@@ -86,7 +105,7 @@ function groupDomains(vhosts: VirtualHost[]): Domain[] {
 /**
  * GET /api/diagnostics - Retorna informações de diagnóstico do sistema
  */
-app.get('/api/diagnostics', (_req, res) => {
+app.get('/api/diagnostics', auth.require(), (_req, res) => {
 	const response: ApiResponse<typeof systemStatus> = {
 		success: true,
 		data: {
@@ -110,7 +129,7 @@ app.get('/api/diagnostics', (_req, res) => {
 /**
  * GET /api/domains - Lista todos os domínios
  */
-app.get('/api/domains', async (_req, res) => {
+app.get('/api/domains', auth.require(), async (_req, res) => {
 	try {
 		const vhosts = await getAllVirtualHosts();
 		const domains = groupDomains(vhosts);
@@ -133,7 +152,7 @@ app.get('/api/domains', async (_req, res) => {
 /**
  * GET /api/vhosts - Lista todos os VirtualHosts (raw)
  */
-app.get('/api/vhosts', async (_req, res) => {
+app.get('/api/vhosts', auth.require(), async (_req, res) => {
 	try {
 		const vhosts = await getAllVirtualHosts();
 
@@ -155,7 +174,7 @@ app.get('/api/vhosts', async (_req, res) => {
 /**
  * POST /api/domains - Adiciona um novo domínio
  */
-app.post('/api/domains', async (req, res) => {
+app.post('/api/domains', auth.require(), async (req, res) => {
 	try {
 		const dto: CreateDomainDTO = req.body;
 
@@ -178,7 +197,7 @@ app.post('/api/domains', async (req, res) => {
 /**
  * PUT /api/domains/:serverName - Atualiza um domínio
  */
-app.put('/api/domains/:serverName', async (req, res) => {
+app.put('/api/domains/:serverName', auth.require(), async (req, res) => {
 	try {
 		const { serverName } = req.params;
 		const dto: UpdateDomainDto = req.body;
@@ -202,7 +221,7 @@ app.put('/api/domains/:serverName', async (req, res) => {
 /**
  * DELETE /api/domains/:serverName - Remove um domínio
  */
-app.delete('/api/domains/:serverName', async (req, res) => {
+app.delete('/api/domains/:serverName', auth.require(), async (req, res) => {
 	try {
 		const { serverName } = req.params;
 
@@ -225,7 +244,7 @@ app.delete('/api/domains/:serverName', async (req, res) => {
 /**
  * POST /api/ssl/obtain - Obtém certificado SSL
  */
-app.post('/api/ssl/obtain', async (req, res) => {
+app.post('/api/ssl/obtain', auth.require(), async (req, res) => {
 	try {
 		const { domain } = req.body;
 
@@ -248,7 +267,7 @@ app.post('/api/ssl/obtain', async (req, res) => {
 /**
  * POST /api/ssl/renew - Renova certificado SSL
  */
-app.post('/api/ssl/renew', async (req, res) => {
+app.post('/api/ssl/renew', auth.require(), async (req, res) => {
 	try {
 		const { domain } = req.body;
 
@@ -271,7 +290,7 @@ app.post('/api/ssl/renew', async (req, res) => {
 /**
  * GET /api/config/download/:type - Download de arquivos de configuração
  */
-app.get('/api/config/download/:type', (req, res) => {
+app.get('/api/config/download/:type', auth.require(), (req, res) => {
 	try {
 		const { type } = req.params;
 
@@ -308,7 +327,7 @@ app.get('/api/config/download/:type', (req, res) => {
 /**
  * POST /api/config/upload/:type - Upload de arquivos de configuração com validação
  */
-app.post('/api/config/upload/:type', async (req, res) => {
+app.post('/api/config/upload/:type', auth.require(), async (req, res) => {
 	try {
 		const { type } = req.params;
 		const { content } = req.body;
@@ -348,7 +367,7 @@ app.post('/api/config/upload/:type', async (req, res) => {
 /**
  * GET /api/logs - Retorna todos os logs armazenados
  */
-app.get('/api/logs', (_req, res) => {
+app.get('/api/logs', auth.require(), (_req, res) => {
 	const logs = getAllLogs();
 	const response: ApiResponse<LogEntry[]> = {
 		success: true,
@@ -360,7 +379,7 @@ app.get('/api/logs', (_req, res) => {
 /**
  * DELETE /api/logs - Limpa todos os logs
  */
-app.delete('/api/logs', (_req, res) => {
+app.delete('/api/logs', auth.require(), (_req, res) => {
 	clearLogs();
 	const response: ApiResponse = {
 		success: true,
@@ -371,7 +390,7 @@ app.delete('/api/logs', (_req, res) => {
 /**
  * GET /api/logs/stream - Server-Sent Events para logs em tempo real
  */
-app.get('/api/logs/stream', (req, res) => {
+app.get('/api/logs/stream', auth.require(), (req, res) => {
 	// Configurar SSE
 	res.setHeader('Content-Type', 'text/event-stream');
 	res.setHeader('Cache-Control', 'no-cache');
