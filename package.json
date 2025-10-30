@@ -22,7 +22,7 @@
     "vite": "^7.1.7"
   },
   "dependencies": {
-    "@vinicius/auth": "file:../auth",
+    "@vinicius/auth": "github:senavinicius/svAuth",
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
   }
