@@ -57,22 +57,16 @@ const authConfig = {
 	secret: process.env.AUTH_SECRET || '',
 };
 
-// Middleware de proteção
-let auth: ReturnType<typeof createAuthMiddleware>;
-
-// Rotas de autenticação (signin, callback, session, signout)
-if (authConfig.googleClientId && authConfig.googleClientSecret && authConfig.secret) {
-	app.use('/auth/*', createAuthRoutes(authConfig));
-	auth = createAuthMiddleware();
-	console.log('✅ Autenticação Google OAuth habilitada');
-} else {
-	// Mock auth para desenvolvimento sem OAuth configurado
-	auth = {
-		require: () => (_req: any, _res: any, next: any) => next(),
-		optional: () => (_req: any, _res: any, next: any) => next(),
-	} as any;
-	console.log('⚠️  Autenticação desabilitada (configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET)');
+// Rotas de autenticação (OBRIGATÓRIO)
+if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.secret) {
+	console.error('❌ ERRO: Variáveis de autenticação não configuradas!');
+	console.error('Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e AUTH_SECRET');
+	process.exit(1);
 }
+
+app.use('/auth/*', createAuthRoutes(authConfig));
+const auth = createAuthMiddleware();
+console.log('✅ Autenticação Google OAuth habilitada');
 
 /**
  * Agrupa VirtualHosts em domínios principais e subdomínios
