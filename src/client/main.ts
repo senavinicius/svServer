@@ -90,19 +90,25 @@ function attachEventListeners() {
 }
 
 /**
- * Inicia fluxo de login com Auth.js
+ * Redireciona para a página de login do Auth.js
  *
- * IMPORTANTE: Este path (/auth/signin) depende de AUTH_GOOGLE_CALLBACK_PATH no servidor!
+ * Esta função vai para: /auth/signin
  *
- * Se AUTH_GOOGLE_CALLBACK_PATH=/auth, as rotas serão:
- * - /auth/signin (esta aqui - inicia login)
- * - /auth/callback/google (callback do Google)
- * - /auth/signout (logout)
+ * O QUE É /auth/signin?
+ * - É a PÁGINA DE LOGIN (onde escolhe "Sign in with Google")
+ * - NÃO é o callback! O callback é outra rota: /auth/callback/google
+ * - O Google redireciona para o callback DEPOIS que o usuário faz login
  *
- * Se você configurou AUTH_GOOGLE_CALLBACK_PATH=/googleLogin, MUDE AQUI também para:
+ * DEPENDÊNCIA: O servidor precisa ter AUTH_GOOGLE_CALLBACK_PATH=/auth
+ *
+ * Por quê? Porque AUTH_GOOGLE_CALLBACK_PATH define o BASE PATH:
+ * - AUTH_GOOGLE_CALLBACK_PATH=/auth cria:
+ *   • /auth/signin (página de login - USADA AQUI)
+ *   • /auth/callback/google (callback do Google - usado pelo Google)
+ *   • /auth/signout (logout)
+ *
+ * Se você mudou AUTH_GOOGLE_CALLBACK_PATH no servidor para /googleLogin, mude aqui:
  * window.location.href = '/googleLogin/signin';
- *
- * NÃO MEXA SEM MOTIVO! Este valor deve estar sincronizado com o servidor.
  */
 function handleLoginClick() {
 	window.location.href = '/auth/signin';
