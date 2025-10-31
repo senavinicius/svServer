@@ -82,22 +82,49 @@ export function groupDomains(vhosts: VirtualHost[]): Domain[] {
 }
 
 /**
- * Valida configuração obrigatória
+ * Valida configuração obrigatória do servidor
+ * Se faltar algo, morre IMEDIATAMENTE com instruções claras
  */
 export function validateConfig() {
 	const required = [
-		{ name: 'GOOGLE_CLIENT_ID', value: process.env.GOOGLE_CLIENT_ID },
-		{ name: 'GOOGLE_CLIENT_SECRET', value: process.env.GOOGLE_CLIENT_SECRET },
-		{ name: 'AUTH_SECRET', value: process.env.AUTH_SECRET },
-		{ name: 'AUTH_GOOGLE_CALLBACK_PATH', value: process.env.AUTH_GOOGLE_CALLBACK_PATH },
+		{
+			name: 'GOOGLE_CLIENT_ID',
+			value: process.env.GOOGLE_CLIENT_ID,
+			hint: 'ID do cliente OAuth. Obtenha em https://console.cloud.google.com',
+		},
+		{
+			name: 'GOOGLE_CLIENT_SECRET',
+			value: process.env.GOOGLE_CLIENT_SECRET,
+			hint: 'Secret do cliente OAuth. Obtenha em https://console.cloud.google.com',
+		},
+		{
+			name: 'AUTH_SECRET',
+			value: process.env.AUTH_SECRET,
+			hint: 'String aleatória com mínimo 32 caracteres para assinar sessões',
+		},
+		{
+			name: 'AUTH_GOOGLE_CALLBACK_PATH',
+			value: process.env.AUTH_GOOGLE_CALLBACK_PATH,
+			hint: 'Caminho onde o Google OAuth irá redirecionar após login (ex: /googleLogin)',
+		},
 	];
 
 	const missing = required.filter(({ value }) => !value);
 
 	if (missing.length > 0) {
-		console.error('❌ ERRO: Variáveis de ambiente obrigatórias não configuradas:');
-		missing.forEach(({ name }) => console.error(`   - ${name}`));
-		console.error('\nConfigure as variáveis no arquivo .env antes de iniciar o servidor.');
+		console.error('');
+		console.error('❌ ERRO FATAL: Variáveis de ambiente obrigatórias não configuradas!');
+		console.error('');
+		console.error('Faltando no arquivo .env:');
+		console.error('');
+		missing.forEach(({ name, hint }) => {
+			console.error(`   ${name}`);
+			console.error(`   └─ ${hint}`);
+			console.error('');
+		});
+		console.error('Configure todas as variáveis no arquivo .env antes de iniciar.');
+		console.error('Use .env.example como referência.');
+		console.error('');
 		process.exit(1);
 	}
 }

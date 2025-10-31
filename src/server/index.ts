@@ -41,7 +41,24 @@ app.use((_req, res, next) => {
 	next();
 });
 
-// Configurar autenticação
+/**
+ * ===== CONFIGURAÇÃO DE AUTENTICAÇÃO =====
+ *
+ * Este projeto usa @vinicius/auth (wrapper do Auth.js) para Google OAuth
+ *
+ * authConfig:
+ * - googleClientId: ID do cliente OAuth (obtido no Google Cloud Console)
+ * - googleClientSecret: Secret do cliente (obtido no Google Cloud Console)
+ * - secret: String aleatória para assinar tokens JWT (mínimo 32 chars)
+ * - googleCallbackPath: Caminho onde o Google redireciona após login
+ *
+ * IMPORTANTE: googleCallbackPath define ONDE as rotas de auth vão responder:
+ * - Se googleCallbackPath = '/googleLogin'
+ * - Então as rotas serão: /googleLogin/signin, /googleLogin/callback, etc.
+ * - Este caminho DEVE estar configurado no Google Cloud Console como URI de redirecionamento
+ *
+ * Exemplo de URI no Google Console: https://seudominio.com/googleLogin/callback/google
+ */
 const authConfig = {
 	googleClientId: process.env.GOOGLE_CLIENT_ID!,
 	googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -49,8 +66,21 @@ const authConfig = {
 	googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
 };
 
+// Cria as rotas de autenticação (signin, callback, signout, session, csrf)
 const authRoutes = createAuthRoutes(authConfig);
+
+// Monta as rotas no caminho especificado (ex: /googleLogin/*)
 app.use(authConfig.googleCallbackPath, authRoutes);
+
+/**
+ * Cria middlewares para proteger rotas:
+ * - auth.require(): Bloqueia acesso se não estiver autenticado (401)
+ * - auth.optional(): Adiciona user se autenticado, mas não bloqueia
+ *
+ * Uso nas rotas:
+ * - app.get('/api/private', auth.require(), ...)  // Protegida
+ * - app.get('/api/public', auth.optional(), ...)  // Pública mas detecta user
+ */
 const auth = createAuthMiddleware();
 
 logger.info('AUTH', 'Sistema de autenticação inicializado');
