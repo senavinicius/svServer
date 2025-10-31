@@ -1,16 +1,13 @@
 import 'dotenv/config';
 import express from 'express';
 import { createAuthRoutes, createAuthMiddleware } from '@vinicius/auth';
-import { checkSystemFiles, validateConfig } from './services/system.js';
+import { checkSystemFiles } from './services/system.js';
 import { createDiagnosticsRoutes } from './routes/diagnostics.js';
 import { createDomainsRoutes } from './routes/domains.js';
 import { createSSLRoutes } from './routes/ssl.js';
 import { createConfigRoutes } from './routes/config.js';
 import { createLogsRoutes } from './routes/logs.js';
 import { logger } from './logger.js';
-
-// Validar configuração obrigatória
-validateConfig();
 
 // Error handlers globais
 process.on('uncaughtException', (error) => {
@@ -42,53 +39,56 @@ app.use((_req, res, next) => {
 });
 
 /**
- * ===== CONFIGURAÇÃO DE AUTENTICAÇÃO =====
+ * ===== CONFIGURAÇÃO DE AUTENTICAÇÃO (OPCIONAL) =====
  *
- * Este projeto usa @vinicius/auth (wrapper do Auth.js) para Google OAuth
+ * O servidor pode subir SEM autenticação configurada.
+ * A página inicial será servida normalmente.
+ * Apenas as rotas /api/* que exigem auth retornarão 401.
  *
- * authConfig:
- * - googleClientId: ID do cliente OAuth (obtido no Google Cloud Console)
- * - googleClientSecret: Secret do cliente (obtido no Google Cloud Console)
- * - secret: String aleatória para assinar tokens JWT (mínimo 32 chars)
- * - googleCallbackPath: BASE PATH para todas as rotas de autenticação
- *
- * IMPORTANTE: googleCallbackPath define ONDE as rotas de auth vão responder:
- * - Se googleCallbackPath = '/auth' (PADRÃO usado pelo cliente)
- * - Então as rotas serão:
- *   • /auth/signin (iniciar login - USADO PELO CLIENTE em main.ts:108)
- *   • /auth/callback/google (callback do Google - configure no Google Console)
- *   • /auth/signout (logout)
- *
- * Se você mudar googleCallbackPath, MUDE NO CLIENTE TAMBÉM (src/client/main.ts:108)
- *
- * Configure no Google Console a URI: https://seudominio.com/auth/callback/google
+ * Para habilitar autenticação, configure no .env:
+ * - GOOGLE_CLIENT_ID
+ * - GOOGLE_CLIENT_SECRET
+ * - AUTH_SECRET
+ * - AUTH_GOOGLE_CALLBACK_PATH=/auth
  */
-const authConfig = {
-	googleClientId: process.env.GOOGLE_CLIENT_ID!,
-	googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-	secret: process.env.AUTH_SECRET!,
-	googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
-};
+const hasAuthConfig =
+	process.env.GOOGLE_CLIENT_ID &&
+	process.env.GOOGLE_CLIENT_SECRET &&
+	process.env.AUTH_SECRET &&
+	process.env.AUTH_GOOGLE_CALLBACK_PATH;
 
-// Cria as rotas de autenticação (signin, callback, signout, session, csrf)
-const authRoutes = createAuthRoutes(authConfig);
+let auth: ReturnType<typeof createAuthMiddleware>;
 
-// Monta as rotas no caminho especificado (ex: /googleLogin/*)
-app.use(authConfig.googleCallbackPath, authRoutes);
+if (hasAuthConfig) {
+	const authConfig = {
+		googleClientId: process.env.GOOGLE_CLIENT_ID!,
+		googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+		secret: process.env.AUTH_SECRET!,
+		googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
+	};
 
-/**
- * Cria middlewares para proteger rotas:
- * - auth.require(): Bloqueia acesso se não estiver autenticado (401)
- * - auth.optional(): Adiciona user se autenticado, mas não bloqueia
- *
- * Uso nas rotas:
- * - app.get('/api/private', auth.require(), ...)  // Protegida
- * - app.get('/api/public', auth.optional(), ...)  // Pública mas detecta user
- */
-const auth = createAuthMiddleware();
+	// Cria as rotas de autenticação (signin, callback, signout, session, csrf)
+	const authRoutes = createAuthRoutes(authConfig);
 
-logger.info('AUTH', 'Sistema de autenticação inicializado');
-console.log('✅ Sistema de autenticação inicializado');
+	// Monta as rotas no caminho especificado (ex: /auth/*)
+	app.use(authConfig.googleCallbackPath, authRoutes);
+
+	// Cria middlewares para proteger rotas
+	auth = createAuthMiddleware();
+
+	logger.info('AUTH', 'Sistema de autenticação inicializado');
+	console.log('✅ Sistema de autenticação inicializado');
+	console.log(`   Rotas auth em: ${authConfig.googleCallbackPath}/*`);
+} else {
+	console.log('⚠️  Autenticação NÃO configurada (servidor funcionando sem login)');
+	console.log('   Configure no .env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET, AUTH_GOOGLE_CALLBACK_PATH');
+
+	// Cria middlewares fake que sempre retornam 401
+	auth = {
+		require: () => (_req: any, res: any) => res.status(401).json({ error: 'Autenticação não configurada' }),
+		optional: () => (_req: any, _res: any, next: any) => next(),
+	};
+}
 
 // Verificar arquivos do sistema
 const systemStatus = checkSystemFiles();
