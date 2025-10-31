@@ -6,7 +6,30 @@ import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL, replaceConf
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
 import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry, logger } from './logger.js';
 import { createAuthRoutes, createAuthMiddleware } from '@vinicius/auth';
-import type { AuthRoutesHandler } from '@vinicius/auth';
+
+/**
+ * Valida configuração obrigatória
+ */
+function validateConfig() {
+	const required = [
+		{ name: 'GOOGLE_CLIENT_ID', value: process.env.GOOGLE_CLIENT_ID },
+		{ name: 'GOOGLE_CLIENT_SECRET', value: process.env.GOOGLE_CLIENT_SECRET },
+		{ name: 'AUTH_SECRET', value: process.env.AUTH_SECRET },
+		{ name: 'AUTH_GOOGLE_CALLBACK_PATH', value: process.env.AUTH_GOOGLE_CALLBACK_PATH },
+	];
+
+	const missing = required.filter(({ value }) => !value);
+
+	if (missing.length > 0) {
+		console.error('❌ ERRO: Variáveis de ambiente obrigatórias não configuradas:');
+		missing.forEach(({ name }) => console.error(`   - ${name}`));
+		console.error('\nConfigure as variáveis no arquivo .env antes de iniciar o servidor.');
+		process.exit(1);
+	}
+}
+
+// Validar antes de tudo
+validateConfig();
 
 // Global error handlers para debug
 process.on('uncaughtException', (error) => {
@@ -68,27 +91,14 @@ app.use((_req, res, next) => {
 
 // Configuração de autenticação
 const authConfig = {
-	googleClientId: process.env.GOOGLE_CLIENT_ID || '',
-	googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-	secret: process.env.AUTH_SECRET || '',
-	googleCallbackPath: '/googleLogin',
+	googleClientId: process.env.GOOGLE_CLIENT_ID!,
+	googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+	secret: process.env.AUTH_SECRET!,
+	googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
 };
 
-// Rotas de autenticação (OBRIGATÓRIO para este projeto)
-if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.secret) {
-	logger.error('AUTH', 'Variáveis de autenticação não configuradas! Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e AUTH_SECRET');
-	console.error('❌ ERRO: Configure as variáveis de autenticação no .env');
-	console.error('   O servidor vai iniciar mas todas as rotas vão retornar 401 Unauthorized');
-}
-
-// Sempre inicializar auth (mesmo que dê erro, para não quebrar o servidor)
-const authRoutes: AuthRoutesHandler = createAuthRoutes(authConfig);
-app.use('/auth', authRoutes);
-
-if (authRoutes.handleGoogleCallback && authRoutes.googleCallbackPath) {
-	app.use(authRoutes.googleCallbackPath, authRoutes.handleGoogleCallback);
-}
-
+const authRoutes = createAuthRoutes(authConfig);
+app.use(authConfig.googleCallbackPath, authRoutes);
 const auth = createAuthMiddleware();
 
 logger.info('AUTH', 'Sistema de autenticação inicializado');

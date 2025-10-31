@@ -1,5 +1,5 @@
 import './style.css';
-import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile } from './api.js';
+import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile, API_URL } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDTO } from '../shared/types.js';
 import { renderDomainsList, renderModal, renderSystemStatus, renderLogsPanel } from './render.js';
 import { addEventListener, addDataAttributeListeners, getElement, queryElement, toggleClass } from './dom.js';
@@ -318,8 +318,7 @@ async function loadDiagnostics() {
  * Download de arquivo de configuração
  */
 function downloadConfig(type: 'http' | 'https') {
-	const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
-	window.location.href = `${baseUrl}/api/config/download/${type}`;
+	window.location.href = `${API_URL}/api/config/download/${type}`;
 }
 
 /**
@@ -411,8 +410,7 @@ async function clearLogsUI() {
 	if (!confirm('Limpar todos os logs?')) return;
 
 	try {
-		const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
-		await fetch(`${baseUrl}/api/logs`, { method: 'DELETE' });
+		await fetch(`${API_URL}/api/logs`, { method: 'DELETE' });
 		state.logs = [];
 		render();
 	} catch (err: any) {
@@ -424,8 +422,7 @@ async function clearLogsUI() {
  * Conecta ao stream de logs em tempo real via SSE
  */
 function connectToLogStream() {
-	const baseUrl = import.meta.env.DEV ? 'http://localhost:3100' : '';
-	const eventSource = new EventSource(`${baseUrl}/api/logs/stream`);
+	const eventSource = new EventSource(`${API_URL}/api/logs/stream`);
 
 	eventSource.onmessage = (event) => {
 		const data = JSON.parse(event.data);

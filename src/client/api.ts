@@ -1,7 +1,29 @@
 import type { Domain, CreateDomainDTO, UpdateDomainDto, ApiResponse, VirtualHost } from '../shared/types.js';
 
-// Usar URL relativa quando em produção (mesma origem do frontend)
-const API_URL = import.meta.env.VITE_API_URL || '';
+/**
+ * Em produção: usa o domínio acessado (window.location.origin)
+ * Em desenvolvimento: REQUER variável VITE_API_URL configurada (ex: http://localhost:3100)
+ */
+function getApiUrl(): string {
+  if (import.meta.env.PROD) {
+    // Produção: sempre usa o domínio atual
+    return window.location.origin;
+  }
+
+  // Dev: OBRIGATÓRIO ter a variável
+  const devUrl = import.meta.env.VITE_API_URL;
+  if (!devUrl) {
+    throw new Error(
+      '❌ ERRO: VITE_API_URL não configurada!\n' +
+      'Configure a variável no arquivo .env:\n' +
+      'VITE_API_URL=http://localhost:3100'
+    );
+  }
+
+  return devUrl;
+}
+
+export const API_URL = getApiUrl();
 
 /**
  * Fetch wrapper com tratamento de erros
