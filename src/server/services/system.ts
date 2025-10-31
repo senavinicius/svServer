@@ -127,4 +127,31 @@ export function validateConfig() {
 		console.error('');
 		process.exit(1);
 	}
+
+	// Validar AUTH_GOOGLE_CALLBACK_PATH é um path, não uma URL
+	const callbackPath = process.env.AUTH_GOOGLE_CALLBACK_PATH!;
+	if (callbackPath.includes('://')) {
+		console.error('');
+		console.error('❌ ERRO FATAL: AUTH_GOOGLE_CALLBACK_PATH está incorreto!');
+		console.error('');
+		console.error(`   Valor atual: ${callbackPath}`);
+		console.error('');
+		console.error('   ❌ ERRADO: AUTH_GOOGLE_CALLBACK_PATH=https://seudominio.com/googleLogin');
+		console.error('   ✅ CORRETO: AUTH_GOOGLE_CALLBACK_PATH=/googleLogin');
+		console.error('');
+		console.error('   Esta variável deve conter APENAS o path (começa com /), NÃO a URL completa!');
+		console.error('   O domínio é detectado automaticamente da requisição.');
+		console.error('');
+		process.exit(1);
+	}
+
+	if (!callbackPath.startsWith('/')) {
+		console.error('');
+		console.error('❌ ERRO FATAL: AUTH_GOOGLE_CALLBACK_PATH deve começar com /');
+		console.error('');
+		console.error(`   Valor atual: ${callbackPath}`);
+		console.error(`   Valor correto: /${callbackPath}`);
+		console.error('');
+		process.exit(1);
+	}
 }
