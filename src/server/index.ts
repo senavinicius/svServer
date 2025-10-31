@@ -50,14 +50,18 @@ app.use((_req, res, next) => {
  * - googleClientId: ID do cliente OAuth (obtido no Google Cloud Console)
  * - googleClientSecret: Secret do cliente (obtido no Google Cloud Console)
  * - secret: String aleatória para assinar tokens JWT (mínimo 32 chars)
- * - googleCallbackPath: Caminho onde o Google redireciona após login
+ * - googleCallbackPath: BASE PATH para todas as rotas de autenticação
  *
  * IMPORTANTE: googleCallbackPath define ONDE as rotas de auth vão responder:
- * - Se googleCallbackPath = '/googleLogin'
- * - Então as rotas serão: /googleLogin/signin, /googleLogin/callback, etc.
- * - Este caminho DEVE estar configurado no Google Cloud Console como URI de redirecionamento
+ * - Se googleCallbackPath = '/auth' (PADRÃO usado pelo cliente)
+ * - Então as rotas serão:
+ *   • /auth/signin (iniciar login - USADO PELO CLIENTE em main.ts:108)
+ *   • /auth/callback/google (callback do Google - configure no Google Console)
+ *   • /auth/signout (logout)
  *
- * Exemplo de URI no Google Console: https://seudominio.com/googleLogin/callback/google
+ * Se você mudar googleCallbackPath, MUDE NO CLIENTE TAMBÉM (src/client/main.ts:108)
+ *
+ * Configure no Google Console a URI: https://seudominio.com/auth/callback/google
  */
 const authConfig = {
 	googleClientId: process.env.GOOGLE_CLIENT_ID!,
