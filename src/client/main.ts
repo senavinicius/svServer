@@ -90,19 +90,21 @@ function attachEventListeners() {
 }
 
 /**
- * Redireciona para a página de login do Auth.js
+ * Redireciona para a página de seleção de provedores do Auth.js
  *
  * A URL depende de VITE_AUTH_CALLBACK_PATH (configurado no .env)
  *
- * Se VITE_AUTH_CALLBACK_PATH=/googleLogin, vai para:
- * - /googleLogin/signin/google (página de login)
+ * Vai para /auth/signin (ou /googleLogin/signin se configurado)
+ * Essa página mostra os provedores disponíveis (botão "Sign in with Google")
  *
- * O Google depois redireciona para:
- * - /googleLogin/callback/google (callback - configure isso no Google Console)
+ * Fluxo:
+ * 1. /auth/signin → página com botão "Sign in with Google"
+ * 2. Usuário clica → /auth/signin/google (Auth.js faz isso)
+ * 3. Google OAuth → /auth/callback/google
  */
 function handleLoginClick() {
 	const basePath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
-	window.location.href = `${basePath}/signin/google`;
+	window.location.href = `${basePath}/signin`;
 }
 
 /**
