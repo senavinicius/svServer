@@ -92,26 +92,17 @@ function attachEventListeners() {
 /**
  * Redireciona para a página de login do Auth.js
  *
- * Esta função vai para: /auth/signin
+ * A URL depende de VITE_AUTH_CALLBACK_PATH (configurado no .env)
  *
- * O QUE É /auth/signin?
- * - É a PÁGINA DE LOGIN (onde escolhe "Sign in with Google")
- * - NÃO é o callback! O callback é outra rota: /auth/callback/google
- * - O Google redireciona para o callback DEPOIS que o usuário faz login
+ * Se VITE_AUTH_CALLBACK_PATH=/googleLogin, vai para:
+ * - /googleLogin/signin/google (página de login)
  *
- * DEPENDÊNCIA: O servidor precisa ter AUTH_GOOGLE_CALLBACK_PATH=/auth
- *
- * Por quê? Porque AUTH_GOOGLE_CALLBACK_PATH define o BASE PATH:
- * - AUTH_GOOGLE_CALLBACK_PATH=/auth cria:
- *   • /auth/signin (página de login - USADA AQUI)
- *   • /auth/callback/google (callback do Google - usado pelo Google)
- *   • /auth/signout (logout)
- *
- * Se você mudou AUTH_GOOGLE_CALLBACK_PATH no servidor para /googleLogin, mude aqui:
- * window.location.href = '/googleLogin/signin';
+ * O Google depois redireciona para:
+ * - /googleLogin/callback/google (callback - configure isso no Google Console)
  */
 function handleLoginClick() {
-	window.location.href = '/auth/signin';
+	const basePath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
+	window.location.href = `${basePath}/signin/google`;
 }
 
 /**
