@@ -77,7 +77,15 @@ if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.
 }
 
 // Sempre inicializar auth (mesmo que dê erro, para não quebrar o servidor)
-app.use('/auth', createAuthRoutes(authConfig));
+const authRoutes = createAuthRoutes(authConfig);
+app.use('/auth', authRoutes);
+
+// Callback personalizado para Google OAuth (/googleLogin)
+app.use('/googleLogin', (req, res, next) => {
+	const originalUrl = req.url;
+	req.url = `/callback/google${originalUrl === '/' ? '' : originalUrl}`;
+	authRoutes(req, res, next);
+});
 const auth = createAuthMiddleware();
 
 logger.info('AUTH', 'Sistema de autenticação inicializado');
