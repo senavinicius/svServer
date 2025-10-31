@@ -6,6 +6,7 @@ import { addDomain, removeDomain, updateDomain, obtainSSL, renewSSL, replaceConf
 import type { CreateDomainDTO, UpdateDomainDto, ApiResponse, Domain, VirtualHost } from '../shared/types.js';
 import { addLogListener, removeLogListener, getAllLogs, clearLogs, type LogEntry, logger } from './logger.js';
 import { createAuthRoutes, createAuthMiddleware } from '@vinicius/auth';
+import type { AuthRoutesHandler } from '@vinicius/auth';
 
 // Global error handlers para debug
 process.on('uncaughtException', (error) => {
@@ -81,7 +82,7 @@ if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.
 }
 
 // Sempre inicializar auth (mesmo que dê erro, para não quebrar o servidor)
-const authRoutes = createAuthRoutes(authConfig);
+const authRoutes: AuthRoutesHandler = createAuthRoutes(authConfig);
 app.use('/auth', authRoutes);
 
 if (authRoutes.handleGoogleCallback && authRoutes.googleCallbackPath) {
