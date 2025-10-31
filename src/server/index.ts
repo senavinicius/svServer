@@ -21,6 +21,9 @@ process.on('unhandledRejection', (reason, promise) => {
 const app = express();
 const PORT = process.env.PORT || 3100;
 
+// Permite que req.protocol reflita HTTPS quando há proxy (Cloudflare/Nginx)
+app.set('trust proxy', true);
+
 // Verificar arquivos APENAS UMA VEZ na inicialização
 function checkSystemFiles() {
 	const httpExists = existsSync('/etc/httpd/conf.d/vhost.conf');
@@ -67,6 +70,7 @@ const authConfig = {
 	googleClientId: process.env.GOOGLE_CLIENT_ID || '',
 	googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
 	secret: process.env.AUTH_SECRET || '',
+	googleCallbackPath: '/googleLogin',
 };
 
 // Rotas de autenticação (OBRIGATÓRIO para este projeto)
@@ -79,6 +83,10 @@ if (!authConfig.googleClientId || !authConfig.googleClientSecret || !authConfig.
 // Sempre inicializar auth (mesmo que dê erro, para não quebrar o servidor)
 const authRoutes = createAuthRoutes(authConfig);
 app.use('/auth', authRoutes);
+
+if (authRoutes.handleGoogleCallback && authRoutes.googleCallbackPath) {
+	app.use(authRoutes.googleCallbackPath, authRoutes.handleGoogleCallback);
+}
 
 const auth = createAuthMiddleware();
 
