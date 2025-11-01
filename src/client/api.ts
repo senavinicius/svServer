@@ -158,25 +158,42 @@ export async function checkAuth(): Promise<{ user?: { id: string; email: string;
 /**
  * Faz logout do usuário
  *
- * Auth.js signout requer:
- * 1. POST request
- * 2. Opcionalmente CSRF token
- * 3. Redirect depois do logout
+ * Auth.js signout requer CSRF token obrigatório
+ * Fluxo:
+ * 1. GET /csrf para pegar token
+ * 2. POST /signout com csrfToken no body
  */
 export async function logout(): Promise<void> {
   try {
     const authPath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
 
-    console.log('[API] Fazendo logout...');
+    console.log('[API] Obtendo CSRF token...');
 
-    // Auth.js geralmente aceita POST para /signout
-    // Redireciona para a página após logout
+    // 1. Obter CSRF token
+    const csrfRes = await fetch(`${API_URL}${authPath}/csrf`, {
+      credentials: 'include',
+      headers: {
+        'accept': 'application/json',
+      },
+    });
+
+    if (!csrfRes.ok) {
+      throw new Error('Falha ao obter CSRF token');
+    }
+
+    const { csrfToken } = await csrfRes.json();
+    console.log('[API] CSRF token obtido:', csrfToken ? 'sim' : 'não');
+
+    // 2. Fazer logout com CSRF token
+    console.log('[API] Fazendo logout com CSRF token...');
+
     const response = await fetch(`${API_URL}${authPath}/signout`, {
       method: 'POST',
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
+      body: `csrfToken=${encodeURIComponent(csrfToken)}`,
     });
 
     console.log('[API] Logout response:', response.status);
@@ -191,6 +208,8 @@ export async function logout(): Promise<void> {
         .replace(/^ +/, "")
         .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
+
+    console.log('[API] Logout concluído com sucesso');
 
   } catch (error) {
     console.error('[API] Erro ao fazer logout:', error);
