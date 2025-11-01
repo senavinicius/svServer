@@ -1,9 +1,12 @@
 import './style.css';
 import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile, API_URL, checkAuth, logout } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDTO } from '../shared/types.js';
-import { renderDomainsList, renderModal, renderSystemStatus, renderLogsPanel } from './render.js';
+import { renderModal } from './render.js';
 import { addEventListener, addDataAttributeListeners, getElement, queryElement, toggleClass } from './dom.js';
 import type { LogEntry } from '../server/logger.js';
+import { renderHeader } from './views/Header.js';
+import { renderLoginView } from './views/LoginView.js';
+import { renderDashboardView } from './views/DashboardView.js';
 
 /**
  * Estado global da aplicação
@@ -30,78 +33,28 @@ const state = {
 function render() {
 	const app = getElement('app');
 
-	// Renderiza header com autenticação
-	const renderAuthButton = () => {
-		if (state.isCheckingAuth) {
-			return '<span style="color: #666;">Verificando...</span>';
-		}
-
-		if (state.user) {
-			return `
-				<div style="display: flex; align-items: center; gap: 12px;">
-					${state.user.picture ? `<img src="${state.user.picture}" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%;">` : ''}
-					<span style="color: #333;">${state.user.name || state.user.email}</span>
-					<button class="btn btn-secondary" id="logout-btn" type="button">Sair</button>
-				</div>
-			`;
-		}
-
-		return '<button class="btn btn-primary" id="login-btn" type="button">🔐 Entrar</button>';
-	};
-
-	// Renderiza conteúdo principal (apenas se autenticado)
-	const renderMainContent = () => {
-		if (state.isCheckingAuth) {
-			return '<div style="text-align: center; padding: 40px; color: #666;">Carregando...</div>';
-		}
-
-		if (!state.user) {
-			return `
-				<div style="text-align: center; padding: 60px 20px;">
-					<h2 style="color: #666; margin-bottom: 12px;">Acesso Restrito</h2>
-					<p style="color: #999; margin-bottom: 24px;">Faça login para acessar o gerenciador</p>
-				</div>
-			`;
-		}
-
-		return `
-			${renderSystemStatus(state.diagnostics)}
-
-			<div class="toolbar">
-				<div class="toolbar-left">
-					<button class="btn btn-secondary btn-small" id="download-http-btn">⬇ HTTP Config</button>
-					<button class="btn btn-secondary btn-small" id="download-https-btn">⬇ HTTPS Config</button>
-					<button class="btn btn-success btn-small" id="upload-http-btn">⬆ Upload HTTP</button>
-				</div>
-				<div class="toolbar-right">
-					<button class="btn btn-secondary btn-small" id="toggle-logs-btn">
-						${state.logsVisible ? '🔽 Ocultar Logs' : '🔼 Mostrar Logs'}
-					</button>
-					<button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
-				</div>
-			</div>
-
-			<div class="domains-list">
-				${renderDomainsList(state.domains, state.isLoading, state.error)}
-			</div>
-
-			${state.logsVisible ? renderLogsPanel(state.logs) : ''}
-		`;
-	};
+	// Seleciona a view apropriada baseada no estado de autenticação
+	const mainContent = state.user
+		? renderDashboardView({
+			domains: state.domains,
+			isLoading: state.isLoading,
+			error: state.error,
+			diagnostics: state.diagnostics,
+			logsVisible: state.logsVisible,
+			logs: state.logs,
+		})
+		: renderLoginView({
+			isCheckingAuth: state.isCheckingAuth,
+		});
 
 	app.innerHTML = `
     <div class="container">
-      <div class="header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <h1>EC2 Manager</h1>
-            <p>Gerenciador de domínios Apache e SSL (Certbot)</p>
-          </div>
-          ${renderAuthButton()}
-        </div>
-      </div>
+      ${renderHeader({
+				isCheckingAuth: state.isCheckingAuth,
+				user: state.user,
+			})}
 
-      ${renderMainContent()}
+      ${mainContent}
     </div>
 
     ${renderModal(state.modal.isOpen, state.modal.mode, state.modal.editingVHost)}

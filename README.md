@@ -126,29 +126,68 @@ Para acessar via domínio (ex: `manager.example.com`):
 
 ```
 src/
-├── client/          # Frontend (TypeScript + CSS)
-│   ├── main.ts      # Ponto de entrada e gerenciamento de estado
-│   ├── render.ts    # Funções de renderização de UI
-│   ├── dom.ts       # Utilitários de manipulação DOM
-│   ├── api.ts       # Cliente HTTP para comunicação com backend
-│   └── style.css    # Estilos CSS (organizado por seções)
-├── server/          # Backend (Express)
-│   ├── index.ts     # API REST
-│   ├── parser.ts    # Parser de VirtualHost
-│   └── manager.ts   # Operações Apache/Certbot
-└── shared/          # Types compartilhados
+├── client/                # Frontend (TypeScript + CSS)
+│   ├── views/            # 📂 Views/Páginas separadas por responsabilidade
+│   │   ├── Header.ts     # Componente de cabeçalho (auth state + user info)
+│   │   ├── LoginView.ts  # Tela para usuários não-autenticados
+│   │   └── DashboardView.ts # Tela principal (autenticado)
+│   ├── main.ts           # Orquestração e gerenciamento de estado
+│   ├── render.ts         # Componentes reutilizáveis (domains, modal, logs)
+│   ├── dom.ts            # Utilitários type-safe para manipulação DOM
+│   ├── api.ts            # Cliente HTTP (inclui credentials para auth)
+│   └── style.css         # Estilos CSS (organizado por seções)
+├── server/               # Backend (Express)
+│   ├── routes/           # Rotas da API (domains, ssl, config, logs, diagnostics)
+│   ├── services/         # Lógica de negócio
+│   ├── index.ts          # Entry point + middleware setup
+│   ├── parser.ts         # Parser de VirtualHost Apache
+│   ├── manager.ts        # Operações Apache/Certbot (via sudo)
+│   └── logger.ts         # Sistema de logs em memória
+└── shared/               # Types compartilhados (client + server)
     └── types.ts
 ```
 
-### Arquitetura do Cliente
+### Arquitetura do Cliente (Frontend)
 
-O código do cliente está organizado em módulos especializados:
+O frontend segue uma **arquitetura baseada em views separadas**, com responsabilidades bem definidas:
 
-- **main.ts**: Gerencia o estado global da aplicação e orquestra a UI
-- **render.ts**: Contém todas as funções de renderização (componentes em template strings)
-- **dom.ts**: Fornece utilitários type-safe para manipulação do DOM
-- **api.ts**: Abstrai toda comunicação HTTP com o backend
-- **style.css**: Estilos organizados em seções bem definidas:
+#### 📁 Views (Páginas)
+- **`Header.ts`** - Componente de cabeçalho reutilizável
+  - Exibe estado de auth (loading, botão "Entrar", ou user info)
+  - Renderiza avatar, nome e botão "Sair" quando logado
+
+- **`LoginView.ts`** - Tela para usuários **não-autenticados**
+  - Mensagem "Acesso Restrito"
+  - Loading state enquanto verifica autenticação
+
+- **`DashboardView.ts`** - Tela principal para usuários **autenticados**
+  - Status do sistema (diagnostics)
+  - Toolbar com ações (download/upload configs, toggle logs)
+  - Lista de domínios
+  - Painel de logs (opcional)
+
+#### 🔧 Módulos Core
+- **`main.ts`** - Orquestração da aplicação
+  - Gerencia estado global
+  - Seleciona view apropriada (LoginView vs DashboardView)
+  - Coordena lifecycle (init, auth check, data loading)
+
+- **`render.ts`** - Componentes reutilizáveis
+  - Lista de domínios (`renderDomainsList`)
+  - Modal de add/edit (`renderModal`)
+  - Status SSL, botões de ação, logs, etc.
+
+- **`dom.ts`** - Utilitários DOM type-safe
+  - Event listeners com null-safety
+  - Seletores tipados
+
+- **`api.ts`** - Cliente HTTP
+  - Wrapper para fetch com `credentials: 'include'`
+  - Tratamento de erros centralizado
+  - Funções para todas as rotas da API
+
+#### 🎨 Estilos
+- **`style.css`** - Organizado em seções:
   - Reset e Base
   - Layout Principal
   - Botões
@@ -156,6 +195,14 @@ O código do cliente está organizado em módulos especializados:
   - Modal e Formulários
   - Estados e Mensagens
   - Diagnósticos e Status do Sistema
+
+### Separação de Responsabilidades
+
+✅ **Views separadas** - LoginView e DashboardView em arquivos próprios
+✅ **Estado centralizado** - Gerenciado no `main.ts`
+✅ **Componentes reutilizáveis** - Funções de renderização no `render.ts`
+✅ **Type-safety** - TypeScript com interfaces bem definidas
+✅ **Autenticação integrada** - Cookies enviados automaticamente em todas as requisições
 
 ## API Endpoints
 

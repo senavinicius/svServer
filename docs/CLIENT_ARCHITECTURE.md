@@ -14,32 +14,71 @@ O frontend é construído com **TypeScript vanilla** e **Vite**, seguindo princ�
 
 ```
 src/client/
-├── main.ts      # Ponto de entrada, gerenciamento de estado
-├── render.ts    # Funções de renderização (componentes)
-├── dom.ts       # Utilitários para manipulação DOM
-├── api.ts       # Cliente HTTP para backend
-└── style.css    # Estilos CSS com variáveis
+├── views/                # 📂 Views/Páginas separadas por responsabilidade
+│   ├── Header.ts         # Componente de cabeçalho (auth state + user info)
+│   ├── LoginView.ts      # Tela para usuários não-autenticados
+│   └── DashboardView.ts  # Tela principal (autenticado)
+├── main.ts               # Orquestração e gerenciamento de estado
+├── render.ts             # Componentes reutilizáveis (domains, modal, logs)
+├── dom.ts                # Utilitários type-safe para manipulação DOM
+├── api.ts                # Cliente HTTP (inclui credentials para auth)
+└── style.css             # Estilos CSS com variáveis
 ```
 
 ## Módulos
 
-### main.ts
-**Responsabilidade**: Gerenciamento de estado e orquestração da aplicação
+### 📁 Views (Páginas Separadas)
 
-- **Estado Global**: Objeto `state` contendo domínios, loading, erro e modal
-- **Renderização**: Função `render()` que atualiza toda UI
-- **Event Handlers**: Funções para manipular eventos do usuário
-- **Mapa de Ações**: Objeto `DOMAIN_ACTIONS` que mapeia ações para funções
-- **Logging**: abre conexão SSE (`/api/logs/stream`), atualiza `state.logs` e expõe handlers para toggle/clear
+#### views/Header.ts
+**Responsabilidade**: Componente de cabeçalho reutilizável
+
+- Renderiza título e descrição da aplicação
+- Exibe estado de autenticação:
+  - Loading: "Verificando..."
+  - Não logado: Botão "🔐 Entrar"
+  - Logado: Avatar + Nome + Botão "Sair"
+- **Props**: `{ isCheckingAuth: boolean, user: User | null }`
+
+#### views/LoginView.ts
+**Responsabilidade**: Tela para usuários não-autenticados
+
+- Mensagem "Acesso Restrito"
+- Loading state durante verificação de auth
+- **Props**: `{ isCheckingAuth: boolean }`
+- **Quando exibir**: `state.user === null`
+
+#### views/DashboardView.ts
+**Responsabilidade**: Tela principal para usuários autenticados
+
+- Status do sistema (diagnostics)
+- Toolbar com ações (download/upload configs, toggle logs)
+- Lista de domínios gerenciados
+- Painel de logs em tempo real (opcional)
+- **Props**: `{ domains, isLoading, error, diagnostics, logsVisible, logs }`
+- **Quando exibir**: `state.user !== null`
+
+### 🔧 Módulos Core
+
+#### main.ts
+**Responsabilidade**: Orquestração e gerenciamento de estado
+
+- **Estado Global**: `state` contém domains, user, auth status, modal, logs
+- **Renderização**: `render()` seleciona view apropriada (LoginView vs DashboardView)
+- **Lifecycle**:
+  1. `init()` - verifica autenticação via `loadAuth()`
+  2. Se autenticado → carrega dados (domains, diagnostics, logs)
+  3. Se não autenticado → renderiza LoginView
+- **Event Handlers**: Funções para manipular ações do usuário
+- **Mapa de Ações**: `DOMAIN_ACTIONS` mapeia ações para funções
 
 **Padrões aplicados**:
-- Estado centralizado para facilitar debugging
+- Estado centralizado
+- Views separadas por responsabilidade
 - Handlers extraídos para funções nomeadas
-- Uso de mapa de ações ao invés de múltiplos ifs/switches
-- Seletores/DOM centralizados via helpers de `src/client/dom.ts`
+- Uso de mapa de ações (evita switches gigantes)
 
-### render.ts
-**Responsabilidade**: Renderização de componentes UI
+#### render.ts
+**Responsabilidade**: Componentes reutilizáveis (usados pelas views)
 
 **Configurações data-driven**:
 ```typescript
@@ -70,7 +109,7 @@ const SSL_STATUS_CONFIG = {
 - `renderSystemStatus()`: Exibe avisos do sistema
 - `renderLogsPanel()`: Estrutura painel com histórico + ações de limpeza
 
-### dom.ts
+#### dom.ts
 **Responsabilidade**: Utilitários type-safe para manipulação DOM
 
 Fornece funções auxiliares com type-safety:
@@ -83,14 +122,21 @@ Fornece funções auxiliares com type-safety:
 
 **Uso atual**: `main.ts` consome esses helpers para montar listeners (botões, formulários, ações dos cards) e alternar grupos de campos do modal com type-safety.
 
-### api.ts
+#### api.ts
 **Responsabilidade**: Comunicação com backend
 
-- Wrapper `apiFetch()` para fetch com tratamento de erros
-- Funções específicas para cada endpoint
-- Type-safety com TypeScript
+- Wrapper `apiFetch()` com:
+  - `credentials: 'include'` - envia cookies de autenticação
+  - Tratamento centralizado de erros
+  - Type-safety com TypeScript
+- Funções específicas para cada endpoint:
+  - `getDomains()`, `addDomain()`, `updateDomain()`, `deleteDomain()`
+  - `obtainSSL()`, `renewSSL()`
+  - `checkAuth()` - verifica sessão ativa
+  - `logout()` - faz logout do usuário
+  - `uploadConfigFile()`, `getDiagnostics()`
 
-### style.css
+#### style.css
 **Responsabilidade**: Estilos visuais
 
 **Organização**:
@@ -196,6 +242,50 @@ async function handleUpdateDomain(formData: FormData) { /* ... */ }
 
 ## Fluxo de Dados
 
+### Inicialização
+```
+┌──────────────┐
+│   init()     │
+└──────┬───────┘
+       │ 1. Verifica auth
+       ▼
+┌──────────────┐
+│  loadAuth()  │ ──► checkAuth() API
+└──────┬───────┘
+       │ user?
+       ▼
+    ┌──┴──┐
+    │ Sim │ Não
+    ▼     ▼
+┌──────┐ ┌────────────┐
+│ Load │ │ Renderiza  │
+│ Data │ │ LoginView  │
+└──────┘ └────────────┘
+```
+
+### Renderização por Estado
+```
+┌─────────────────┐
+│  render()       │
+└────────┬────────┘
+         │ state.user?
+    ┌────┴────┐
+    │ Logado? │
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │   Sim   │   Não
+    ▼         ▼
+┌──────────────┐  ┌──────────────┐
+│ DashboardView│  │  LoginView   │
+│              │  │              │
+│ • Domains    │  │ • Mensagem   │
+│ • Logs       │  │ • Botão      │
+│ • Toolbar    │  │   Entrar     │
+└──────────────┘  └──────────────┘
+```
+
+### Interação do Usuário
 ```
 ┌─────────────┐
 │   Usuário   │
@@ -205,10 +295,10 @@ async function handleUpdateDomain(formData: FormData) { /* ... */ }
 ┌─────────────┐
 │   main.ts   │ ◄─── Event Handlers
 └──────┬──────┘
-       │ Chama API
+       │ Chama API (com credentials)
        ▼
 ┌─────────────┐
-│   api.ts    │ ◄─── HTTP Request
+│   api.ts    │ ◄─── HTTP Request + Cookies
 └──────┬──────┘
        │ Response
        ▼
@@ -216,6 +306,12 @@ async function handleUpdateDomain(formData: FormData) { /* ... */ }
 │   state     │ ◄─── Atualiza estado
 └──────┬──────┘
        │ Trigger render()
+       ▼
+┌─────────────┐
+│   Views     │ ◄─── Seleciona view
+│ (Login/Dash)│      apropriada
+└──────┬──────┘
+       │ Usa componentes
        ▼
 ┌─────────────┐
 │  render.ts  │ ◄─── Gera HTML
@@ -238,11 +334,19 @@ async function handleUpdateDomain(formData: FormData) { /* ... */ }
 
 Para adicionar novos recursos:
 
-1. **Novo tipo de domínio**: Adicione em `TYPE_CONFIG` no render.ts
-2. **Novo status SSL**: Adicione em `SSL_STATUS_CONFIG` no render.ts
-3. **Nova ação**: Adicione em `DOMAIN_ACTIONS` no main.ts
-4. **Novo endpoint**: Adicione função em api.ts
-5. **Novo estilo**: Use variáveis CSS existentes ou adicione novas
+1. **Nova página/view**: Crie arquivo em `views/` e exporte função de renderização
+   ```typescript
+   // views/SettingsView.ts
+   export function renderSettingsView(props: SettingsProps): string {
+     return `<div>...</div>`;
+   }
+   ```
+
+2. **Novo tipo de domínio**: Adicione em `TYPE_CONFIG` no render.ts
+3. **Novo status SSL**: Adicione em `SSL_STATUS_CONFIG` no render.ts
+4. **Nova ação**: Adicione em `DOMAIN_ACTIONS` no main.ts
+5. **Novo endpoint**: Adicione função em api.ts com `credentials: 'include'`
+6. **Novo estilo**: Use variáveis CSS existentes ou adicione novas em `:root`
 
 ## Testes
 
