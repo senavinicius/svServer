@@ -27,6 +27,20 @@ export interface DashboardViewProps {
 export function renderDashboardView(props: DashboardViewProps): string {
 	const { domains, isLoading, error, diagnostics, logsVisible, logs } = props;
 
+	// Se há erro de autenticação, mostra aviso especial
+	if (error && error.includes('Não autenticado')) {
+		return `
+			<div style="text-align: center; padding: 60px 20px;">
+				<h2 style="color: #ef4444; margin-bottom: 12px;">⚠️ Erro de Autenticação</h2>
+				<p style="color: #666; margin-bottom: 16px;">Sua sessão pode ter expirado ou há um problema com os cookies.</p>
+				<p style="color: #999; font-size: 14px; margin-bottom: 24px;">
+					Tente recarregar a página ou fazer login novamente.
+				</p>
+				<button class="btn btn-primary" onclick="window.location.reload()">🔄 Recarregar Página</button>
+			</div>
+		`;
+	}
+
 	return `
 		${renderSystemStatus(diagnostics)}
 

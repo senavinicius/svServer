@@ -107,12 +107,21 @@ function handleLoginClick() {
  */
 async function handleLogoutClick() {
 	try {
+		console.log('[DEBUG] Iniciando logout...');
 		await logout();
+
+		// Limpar estado local
 		state.user = null;
 		state.domains = [];
 		state.diagnostics = null;
-		render();
+		state.logs = [];
+
+		console.log('[DEBUG] Logout concluído, recarregando página...');
+
+		// Recarregar página para garantir limpeza completa
+		window.location.reload();
 	} catch (err: any) {
+		console.error('[DEBUG] Erro no logout:', err);
 		alert(`Erro ao fazer logout: ${err.message}`);
 	}
 }
@@ -314,8 +323,11 @@ async function loadDomains() {
 	render();
 
 	try {
+		console.log('[DEBUG] Carregando domínios...');
 		state.domains = await getDomains();
+		console.log('[DEBUG] Domínios carregados:', state.domains.length);
 	} catch (err: any) {
+		console.error('[DEBUG] Erro ao carregar domínios:', err);
 		state.error = err.message;
 	} finally {
 		state.isLoading = false;
@@ -343,12 +355,18 @@ async function loadAuth() {
 	render();
 
 	try {
+		console.log('[DEBUG] Verificando autenticação...');
 		const authData = await checkAuth();
+		console.log('[DEBUG] Auth data recebido:', authData);
+
 		if (authData?.user) {
 			state.user = authData.user;
+			console.log('[DEBUG] Usuário autenticado:', state.user.email);
+		} else {
+			console.log('[DEBUG] Nenhum usuário autenticado');
 		}
 	} catch (err: any) {
-		console.error('Erro ao verificar autenticação:', err);
+		console.error('[DEBUG] Erro ao verificar autenticação:', err);
 	} finally {
 		state.isCheckingAuth = false;
 		render();
@@ -513,10 +531,16 @@ async function init() {
 
 	// Se autenticado, carregar dados
 	if (state.user) {
+		console.log('[DEBUG] Usuário autenticado, carregando dados...');
+
+		// Pequeno delay para garantir que cookies estão prontos
+		await new Promise(resolve => setTimeout(resolve, 100));
+
 		loadDomains();
 		loadDiagnostics();
 		connectToLogStream();
 	} else {
+		console.log('[DEBUG] Usuário não autenticado, mostrando tela de login');
 		// Se não autenticado, apenas renderizar (mostrará tela de login)
 		render();
 	}

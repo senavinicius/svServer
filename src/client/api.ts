@@ -15,6 +15,8 @@ export const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
  * Fetch wrapper com tratamento de erros
  */
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  console.log('[API] Chamando:', endpoint, { credentials: 'include' });
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     credentials: 'include', // IMPORTANTE: Envia cookies de autenticação
@@ -24,7 +26,10 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
     },
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   const data: ApiResponse<T> = await response.json();
+  console.log('[API] Response data:', data);
 
   if (!data.success) {
     throw new Error(data.error || 'Erro desconhecido');
@@ -120,6 +125,8 @@ export async function uploadConfigFile(type: 'http' | 'https', content: string):
 export async function checkAuth(): Promise<{ user?: { id: string; email: string; name?: string; picture?: string } } | null> {
   try {
     const authPath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
+    console.log('[API] Verificando auth em:', `${API_URL}${authPath}/session`);
+
     const response = await fetch(`${API_URL}${authPath}/session`, {
       credentials: 'include', // Importante: inclui cookies na requisição
       headers: {
@@ -127,30 +134,66 @@ export async function checkAuth(): Promise<{ user?: { id: string; email: string;
       },
     });
 
+    console.log('[API] Auth response status:', response.status);
+    console.log('[API] Auth response headers:', {
+      'set-cookie': response.headers.get('set-cookie'),
+      'content-type': response.headers.get('content-type'),
+    });
+
     if (!response.ok) {
+      console.log('[API] Auth response não OK');
       return null;
     }
 
     const data = await response.json();
+    console.log('[API] Auth session data:', data);
+
     return data.user ? data : null;
   } catch (error) {
-    console.error('Erro ao verificar autenticação:', error);
+    console.error('[API] Erro ao verificar autenticação:', error);
     return null;
   }
 }
 
 /**
  * Faz logout do usuário
+ *
+ * Auth.js signout requer:
+ * 1. POST request
+ * 2. Opcionalmente CSRF token
+ * 3. Redirect depois do logout
  */
 export async function logout(): Promise<void> {
   try {
     const authPath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
-    await fetch(`${API_URL}${authPath}/signout`, {
+
+    console.log('[API] Fazendo logout...');
+
+    // Auth.js geralmente aceita POST para /signout
+    // Redireciona para a página após logout
+    const response = await fetch(`${API_URL}${authPath}/signout`, {
       method: 'POST',
       credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
+
+    console.log('[API] Logout response:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`Logout falhou: ${response.statusText}`);
+    }
+
+    // Limpar cookies do lado do cliente também
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
   } catch (error) {
-    console.error('Erro ao fazer logout:', error);
+    console.error('[API] Erro ao fazer logout:', error);
     throw error;
   }
 }
