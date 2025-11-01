@@ -111,3 +111,45 @@ export async function uploadConfigFile(type: 'http' | 'https', content: string):
     body: JSON.stringify({ content }),
   });
 }
+
+/**
+ * Verifica se há uma sessão ativa de autenticação
+ * Retorna os dados do usuário se logado, ou null se não logado
+ */
+export async function checkAuth(): Promise<{ user?: { id: string; email: string; name?: string; picture?: string } } | null> {
+  try {
+    const authPath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
+    const response = await fetch(`${API_URL}${authPath}/session`, {
+      credentials: 'include', // Importante: inclui cookies na requisição
+      headers: {
+        'accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.user ? data : null;
+  } catch (error) {
+    console.error('Erro ao verificar autenticação:', error);
+    return null;
+  }
+}
+
+/**
+ * Faz logout do usuário
+ */
+export async function logout(): Promise<void> {
+  try {
+    const authPath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
+    await fetch(`${API_URL}${authPath}/signout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch (error) {
+    console.error('Erro ao fazer logout:', error);
+    throw error;
+  }
+}

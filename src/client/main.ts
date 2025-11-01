@@ -1,5 +1,5 @@
 import './style.css';
-import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile, API_URL } from './api.js';
+import { getDomains, addDomain, updateDomain, deleteDomain, obtainSSL, renewSSL, getDiagnostics, uploadConfigFile, API_URL, checkAuth, logout } from './api.js';
 import type { Domain, VirtualHost, CreateDomainDTO } from '../shared/types.js';
 import { renderDomainsList, renderModal, renderSystemStatus, renderLogsPanel } from './render.js';
 import { addEventListener, addDataAttributeListeners, getElement, queryElement, toggleClass } from './dom.js';
@@ -20,6 +20,8 @@ const state = {
 	},
 	logs: [] as LogEntry[],
 	logsVisible: true,
+	user: null as { id: string; email: string; name?: string; picture?: string } | null,
+	isCheckingAuth: true,
 };
 
 /**
@@ -27,6 +29,65 @@ const state = {
  */
 function render() {
 	const app = getElement('app');
+
+	// Renderiza header com autenticação
+	const renderAuthButton = () => {
+		if (state.isCheckingAuth) {
+			return '<span style="color: #666;">Verificando...</span>';
+		}
+
+		if (state.user) {
+			return `
+				<div style="display: flex; align-items: center; gap: 12px;">
+					${state.user.picture ? `<img src="${state.user.picture}" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%;">` : ''}
+					<span style="color: #333;">${state.user.name || state.user.email}</span>
+					<button class="btn btn-secondary" id="logout-btn" type="button">Sair</button>
+				</div>
+			`;
+		}
+
+		return '<button class="btn btn-primary" id="login-btn" type="button">🔐 Entrar</button>';
+	};
+
+	// Renderiza conteúdo principal (apenas se autenticado)
+	const renderMainContent = () => {
+		if (state.isCheckingAuth) {
+			return '<div style="text-align: center; padding: 40px; color: #666;">Carregando...</div>';
+		}
+
+		if (!state.user) {
+			return `
+				<div style="text-align: center; padding: 60px 20px;">
+					<h2 style="color: #666; margin-bottom: 12px;">Acesso Restrito</h2>
+					<p style="color: #999; margin-bottom: 24px;">Faça login para acessar o gerenciador</p>
+				</div>
+			`;
+		}
+
+		return `
+			${renderSystemStatus(state.diagnostics)}
+
+			<div class="toolbar">
+				<div class="toolbar-left">
+					<button class="btn btn-secondary btn-small" id="download-http-btn">⬇ HTTP Config</button>
+					<button class="btn btn-secondary btn-small" id="download-https-btn">⬇ HTTPS Config</button>
+					<button class="btn btn-success btn-small" id="upload-http-btn">⬆ Upload HTTP</button>
+				</div>
+				<div class="toolbar-right">
+					<button class="btn btn-secondary btn-small" id="toggle-logs-btn">
+						${state.logsVisible ? '🔽 Ocultar Logs' : '🔼 Mostrar Logs'}
+					</button>
+					<button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
+				</div>
+			</div>
+
+			<div class="domains-list">
+				${renderDomainsList(state.domains, state.isLoading, state.error)}
+			</div>
+
+			${state.logsVisible ? renderLogsPanel(state.logs) : ''}
+		`;
+	};
 
 	app.innerHTML = `
     <div class="container">
@@ -36,31 +97,11 @@ function render() {
             <h1>EC2 Manager</h1>
             <p>Gerenciador de domínios Apache e SSL (Certbot)</p>
           </div>
-          <button class="btn btn-primary" id="login-btn" type="button">🔐 Entrar</button>
+          ${renderAuthButton()}
         </div>
       </div>
 
-      ${renderSystemStatus(state.diagnostics)}
-
-      <div class="toolbar">
-        <div class="toolbar-left">
-          <button class="btn btn-secondary btn-small" id="download-http-btn">⬇ HTTP Config</button>
-          <button class="btn btn-secondary btn-small" id="download-https-btn">⬇ HTTPS Config</button>
-          <button class="btn btn-success btn-small" id="upload-http-btn">⬆ Upload HTTP</button>
-        </div>
-        <div class="toolbar-right">
-          <button class="btn btn-secondary btn-small" id="toggle-logs-btn">
-            ${state.logsVisible ? '🔽 Ocultar Logs' : '🔼 Mostrar Logs'}
-          </button>
-          <button class="btn btn-primary" id="add-domain-btn">+ Adicionar Domínio</button>
-        </div>
-      </div>
-
-      <div class="domains-list">
-        ${renderDomainsList(state.domains, state.isLoading, state.error)}
-      </div>
-
-      ${state.logsVisible ? renderLogsPanel(state.logs) : ''}
+      ${renderMainContent()}
     </div>
 
     ${renderModal(state.modal.isOpen, state.modal.mode, state.modal.editingVHost)}
@@ -75,6 +116,7 @@ function render() {
 function attachEventListeners() {
 	addEventListener('add-domain-btn', 'click', openAddModal);
 	addEventListener('login-btn', 'click', handleLoginClick);
+	addEventListener('logout-btn', 'click', handleLogoutClick);
 	addEventListener('cancel-btn', 'click', closeModal);
 	addEventListener('modal', 'click', handleModalBackdropClick);
 	addEventListener('domain-form', 'submit', handleFormSubmit);
@@ -105,6 +147,21 @@ function attachEventListeners() {
 function handleLoginClick() {
 	const basePath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
 	window.location.href = `${basePath}/signin`;
+}
+
+/**
+ * Faz logout do usuário
+ */
+async function handleLogoutClick() {
+	try {
+		await logout();
+		state.user = null;
+		state.domains = [];
+		state.diagnostics = null;
+		render();
+	} catch (err: any) {
+		alert(`Erro ao fazer logout: ${err.message}`);
+	}
 }
 
 /**
@@ -326,6 +383,26 @@ async function loadDiagnostics() {
 }
 
 /**
+ * Verifica autenticação do usuário
+ */
+async function loadAuth() {
+	state.isCheckingAuth = true;
+	render();
+
+	try {
+		const authData = await checkAuth();
+		if (authData?.user) {
+			state.user = authData.user;
+		}
+	} catch (err: any) {
+		console.error('Erro ao verificar autenticação:', err);
+	} finally {
+		state.isCheckingAuth = false;
+		render();
+	}
+}
+
+/**
  * Download de arquivo de configuração
  */
 function downloadConfig(type: 'http' | 'https') {
@@ -477,10 +554,19 @@ function connectToLogStream() {
 /**
  * Inicialização da aplicação
  */
-function init() {
-	loadDomains();
-	loadDiagnostics();
-	connectToLogStream();
+async function init() {
+	// Primeiro, verificar autenticação
+	await loadAuth();
+
+	// Se autenticado, carregar dados
+	if (state.user) {
+		loadDomains();
+		loadDiagnostics();
+		connectToLogStream();
+	} else {
+		// Se não autenticado, apenas renderizar (mostrará tela de login)
+		render();
+	}
 }
 
 // Iniciar aplicação

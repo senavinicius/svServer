@@ -7,6 +7,23 @@ Dashboard web para gerenciar Apache e Certbot no próprio servidor EC2 t4g.small
 - **Frontend**: Vite + TypeScript vanilla
 - **Backend**: Node.js 18+ + Express 5.x
 - **Servidor**: Amazon Linux 2023 (ARM64)
+- **Autenticação**: [@vinicius/auth](https://github.com/senavinicius/svAuth) (Google OAuth via Auth.js)
+
+## Arquitetura Modular
+
+Este projeto segue uma **arquitetura modularizada e profissional**:
+
+- **`@vinicius/auth`** é um projeto separado mantido via GitHub
+- Importado como dependência via npm: `"@vinicius/auth": "git+https://github.com/senavinicius/svAuth.git#main"`
+- ❌ **Proibido**: Acesso local entre projetos via filesystem
+- ✅ **Correto**: Integração via npm/GitHub para reutilização adequada
+
+### Por que essa arquitetura?
+
+1. **Separação de responsabilidades**: Autenticação é uma preocupação transversal reutilizável
+2. **Versionamento independente**: Mudanças no auth não afetam o core do EC2 Manager
+3. **Reutilização**: Outros projetos podem usar `@vinicius/auth` facilmente
+4. **Profissionalismo**: Segue padrões da indústria (microserviços, modularização)
 
 ## Funcionalidades Implementadas (MVP)
 
@@ -141,6 +158,18 @@ O código do cliente está organizado em módulos especializados:
   - Diagnósticos e Status do Sistema
 
 ## API Endpoints
+
+### Autenticação (fornecida por @vinicius/auth)
+
+**Base path**: `/googleLogin` (configurável via `AUTH_GOOGLE_CALLBACK_PATH`)
+
+- `GET /googleLogin/session` - Retorna sessão atual (usado pelo frontend para verificar login)
+- `POST /googleLogin/signin/google` - Inicia fluxo OAuth com Google
+- `GET /googleLogin/callback/google` - Callback OAuth (registrado no Google Console)
+- `POST /googleLogin/signout` - Faz logout
+- `GET /googleLogin/csrf` - Retorna token CSRF para login
+
+**Importante**: Todos os endpoints da API abaixo requerem autenticação (exceto `/googleLogin/*`)
 
 ### Domínios
 - `GET /api/domains` - Lista domínios agrupados
