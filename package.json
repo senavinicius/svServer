@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@vinicius/auth": "git+https://github.com/senavinicius/svAuth.git#main",
+    "@vinicius/logger": "github:senavinicius/logger",
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
   }

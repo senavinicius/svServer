@@ -1,4 +1,11 @@
-// Níveis de log
+/**
+ * New logger implementation using @vinicius/logger
+ * Maintains backward compatibility with old logger API
+ */
+import { createLogger, SSETransport } from '@vinicius/logger';
+import type { LogEntry as NewLogEntry } from '@vinicius/logger';
+
+// Re-export old types for backward compatibility
 export const LogLevel = {
   DEBUG: 'DEBUG',
   INFO: 'INFO',
@@ -17,13 +24,59 @@ export interface LogEntry {
   data?: any;
 }
 
-// Armazenar logs em memória (últimos 500)
+// In-memory storage for backward compatibility
 const MAX_LOGS = 500;
 const logs: LogEntry[] = [];
 
-// Listeners para logs em tempo real
+// Listeners for SSE
 type LogListener = (entry: LogEntry) => void;
 const listeners: Set<LogListener> = new Set();
+
+// Create SSE transport
+const sseTransport = new SSETransport();
+
+// Custom transport for in-memory storage + listeners
+class MemoryAndListenerTransport {
+  write(entry: NewLogEntry): void {
+    // Convert new format to old format
+    const oldEntry: LogEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      timestamp: entry.time,
+      level: entry.level.toUpperCase() as LogLevel,
+      operation: entry.category || 'SYSTEM',
+      message: entry.msg,
+      data: entry.data,
+    };
+
+    // Store in memory
+    logs.push(oldEntry);
+    if (logs.length > MAX_LOGS) {
+      logs.shift();
+    }
+
+    // Notify listeners
+    listeners.forEach(listener => {
+      try {
+        listener(oldEntry);
+      } catch (error) {
+        console.error('Erro ao notificar listener:', error);
+      }
+    });
+  }
+}
+
+// Create logger with both transports
+const memoryTransport = new MemoryAndListenerTransport();
+
+export const internalLogger = createLogger({
+  level: process.env.LOG_LEVEL === 'debug' ? 'debug' : 'info',
+  pretty: process.env.NODE_ENV !== 'production',
+  sanitize: ['password', 'token', 'secret'],
+  transports: [memoryTransport, sseTransport],
+});
+
+// Export SSE transport for route setup
+export { sseTransport };
 
 /**
  * Adiciona um listener para receber logs em tempo real
@@ -54,85 +107,30 @@ export function clearLogs(): void {
 }
 
 /**
- * Formata uma entrada de log para console
- */
-function formatLogEntry(entry: LogEntry): string {
-  const dataStr = entry.data ? `\n  Data: ${JSON.stringify(entry.data, null, 2)}` : '';
-  return `[${entry.timestamp}] [${entry.level}] [${entry.operation}] ${entry.message}${dataStr}`;
-}
-
-/**
- * Escreve log e notifica listeners
- */
-function writeLog(level: LogLevel, operation: string, message: string, data?: any): void {
-  const entry: LogEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-    timestamp: new Date().toISOString(),
-    level,
-    operation,
-    message,
-    data,
-  };
-
-  // Adicionar aos logs em memória
-  logs.push(entry);
-
-  // Manter apenas os últimos MAX_LOGS
-  if (logs.length > MAX_LOGS) {
-    logs.shift();
-  }
-
-  // Log no console
-  const formattedLog = formatLogEntry(entry);
-  switch (level) {
-    case LogLevel.ERROR:
-      console.error(formattedLog);
-      break;
-    case LogLevel.WARN:
-      console.warn(formattedLog);
-      break;
-    case LogLevel.DEBUG:
-      console.debug(formattedLog);
-      break;
-    default:
-      console.log(formattedLog);
-  }
-
-  // Notificar todos os listeners (frontend ao vivo)
-  listeners.forEach(listener => {
-    try {
-      listener(entry);
-    } catch (error) {
-      console.error('Erro ao notificar listener:', error);
-    }
-  });
-}
-
-/**
- * Logger principal
+ * Logger com API compatível com versão antiga
  */
 export const logger = {
   debug(operation: string, message: string, data?: any): void {
-    writeLog(LogLevel.DEBUG, operation, message, data);
+    internalLogger.debug(operation, message, data);
   },
 
   info(operation: string, message: string, data?: any): void {
-    writeLog(LogLevel.INFO, operation, message, data);
+    internalLogger.info(operation, message, data);
   },
 
   warn(operation: string, message: string, data?: any): void {
-    writeLog(LogLevel.WARN, operation, message, data);
+    internalLogger.warn(operation, message, data);
   },
 
   error(operation: string, message: string, data?: any): void {
-    writeLog(LogLevel.ERROR, operation, message, data);
+    internalLogger.error(operation, message, data);
   },
 
   /**
    * Log de operações que modificam arquivos - MUITO IMPORTANTE
    */
   fileOperation(operation: string, filePath: string, before: string, after: string): void {
-    writeLog(LogLevel.INFO, operation, `Modificando arquivo: ${filePath}`, {
+    internalLogger.info(operation, `Modificando arquivo: ${filePath}`, {
       filePath,
       beforeLength: before.length,
       afterLength: after.length,
@@ -146,4 +144,4 @@ export const logger = {
 };
 
 // Log de inicialização
-logger.info('SYSTEM', 'Logger inicializado - logs em memória para streaming ao vivo');
+logger.info('SYSTEM', 'Logger inicializado com @vinicius/logger - logs em memória + SSE streaming');
