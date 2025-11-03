@@ -26,6 +26,18 @@ const PORT = process.env.PORT || 3100;
 // Permite que req.protocol reflita HTTPS quando há proxy (Cloudflare/Nginx)
 app.set('trust proxy', true);
 
+// Força HTTPS em produção (Auth.js precisa disso para cookies Secure)
+app.use((req, _res, next) => {
+	const host = req.get('host') || '';
+	const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+
+	if (!isLocalhost) {
+		req.headers['x-forwarded-proto'] = 'https';
+		req.headers['x-forwarded-host'] = host;
+	}
+	next();
+});
+
 // Middleware
 app.use(express.json());
 app.use(express.static('dist'));
@@ -69,7 +81,6 @@ if (hasAuthConfig) {
 		googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
 		secret: process.env.AUTH_SECRET!,
 		googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
-		externalUrl: process.env.AUTH_EXTERNAL_URL,
 	};
 
 	// Cria as rotas de autenticação (signin, callback, signout, session, csrf)
