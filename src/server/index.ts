@@ -69,6 +69,7 @@ if (hasAuthConfig) {
 		googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
 		secret: process.env.AUTH_SECRET!,
 		googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
+		externalUrl: process.env.AUTH_EXTERNAL_URL,
 	};
 
 	// Cria as rotas de autenticação (signin, callback, signout, session, csrf)
