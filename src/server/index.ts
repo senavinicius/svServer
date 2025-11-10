@@ -128,13 +128,25 @@ app.post('/api/test-log', async (req, res) => {
 	const { level, message, data } = req.body;
 	const logLevel = (level || 'info') as 'debug' | 'info' | 'warn' | 'error';
 
+	const startTime = Date.now();
 	try {
 		// Use baseLogger with wait:true to actually wait for the HTTP transport to complete
 		await baseLogger[logLevel]('TEST', message || 'Test log message', data || {}, { wait: true });
-		res.json({ success: true, message: 'Log delivered to logger server!' });
+		const duration = Date.now() - startTime;
+		res.json({ success: true, message: 'Log delivered to logger server!', duration: `${duration}ms` });
 	} catch (error: any) {
-		res.status(500).json({ success: false, message: `Logger server offline: ${error.message}` });
+		const duration = Date.now() - startTime;
+		res.status(500).json({ success: false, message: `Logger server offline: ${error.message}`, duration: `${duration}ms`, error: error.toString() });
 	}
+});
+
+// TEMP: Debug endpoint to check logger configuration
+app.get('/api/logger-config', (req, res) => {
+	res.json({
+		loggerUrl: process.env.LOGGER_URL || 'http://localhost:3005/api/logs/ingest',
+		nodeEnv: process.env.NODE_ENV,
+		logLevel: process.env.LOG_LEVEL || 'info',
+	});
 });
 
 // Iniciar servidor
