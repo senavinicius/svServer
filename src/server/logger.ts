@@ -28,7 +28,7 @@ export interface LogEntry {
 const LOGGER_URL = process.env.LOGGER_URL || 'http://localhost:3005/api/logs/ingest';
 
 // Create logger with HTTP transport to send logs to central server
-export const internalLogger = createLogger({
+const baseLogger = createLogger({
   level: process.env.LOG_LEVEL === 'debug' ? 'debug' : 'info',
   pretty: process.env.NODE_ENV !== 'production',
   sanitize: ['password', 'token', 'secret'],
@@ -44,29 +44,30 @@ export const internalLogger = createLogger({
 
 /**
  * Logger com API compatível com versão antiga
+ * Para usar modo síncrono (wait), use baseLogger diretamente
  */
 export const logger = {
   debug(operation: string, message: string, data?: any): void {
-    internalLogger.debug(operation, message, data);
+    baseLogger.debug(operation, message, data);
   },
 
   info(operation: string, message: string, data?: any): void {
-    internalLogger.info(operation, message, data);
+    baseLogger.info(operation, message, data);
   },
 
   warn(operation: string, message: string, data?: any): void {
-    internalLogger.warn(operation, message, data);
+    baseLogger.warn(operation, message, data);
   },
 
   error(operation: string, message: string, data?: any): void {
-    internalLogger.error(operation, message, data);
+    baseLogger.error(operation, message, data);
   },
 
   /**
    * Log de operações que modificam arquivos - MUITO IMPORTANTE
    */
   fileOperation(operation: string, filePath: string, before: string, after: string): void {
-    internalLogger.info(operation, `Modificando arquivo: ${filePath}`, {
+    baseLogger.info(operation, `Modificando arquivo: ${filePath}`, {
       filePath,
       beforeLength: before.length,
       afterLength: after.length,
@@ -78,6 +79,9 @@ export const logger = {
     });
   },
 };
+
+// Export base logger for advanced usage (e.g., with wait option)
+export { baseLogger };
 
 // Log de inicialização
 logger.info('SYSTEM', 'Logger inicializado - enviando logs para servidor central', { loggerUrl: LOGGER_URL });

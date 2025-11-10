@@ -6,7 +6,7 @@ import { createDiagnosticsRoutes } from './routes/diagnostics.js';
 import { createDomainsRoutes } from './routes/domains.js';
 import { createSSLRoutes } from './routes/ssl.js';
 import { createConfigRoutes } from './routes/config.js';
-import { logger } from './logger.js';
+import { logger, baseLogger } from './logger.js';
 
 // Error handlers globais
 process.on('uncaughtException', (error) => {
@@ -124,13 +124,17 @@ app.use('/api', createSSLRoutes(auth));
 app.use('/api', createConfigRoutes(auth));
 
 // TEMP: Test route for logger resilience
-app.post('/api/test-log', (req, res) => {
+app.post('/api/test-log', async (req, res) => {
 	const { level, message, data } = req.body;
 	const logLevel = (level || 'info') as 'debug' | 'info' | 'warn' | 'error';
 
-	logger[logLevel]('TEST', message || 'Test log message', data || {});
-
-	res.json({ success: true, message: 'Log sent (check if it arrives at logger server)' });
+	try {
+		// Use baseLogger with wait:true to actually wait for the HTTP transport to complete
+		await baseLogger[logLevel]('TEST', message || 'Test log message', data || {}, { wait: true });
+		res.json({ success: true, message: 'Log delivered to logger server!' });
+	} catch (error: any) {
+		res.status(500).json({ success: false, message: `Logger server offline: ${error.message}` });
+	}
 });
 
 // Iniciar servidor
