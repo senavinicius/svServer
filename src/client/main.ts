@@ -355,18 +355,13 @@ async function loadAuth() {
 	render();
 
 	try {
-		console.log('[DEBUG] Verificando autenticação...');
 		const authData = await checkAuth();
-		console.log('[DEBUG] Auth data recebido:', authData);
 
 		if (authData?.user) {
 			state.user = authData.user;
-			console.log('[DEBUG] Usuário autenticado:', state.user.email);
-		} else {
-			console.log('[DEBUG] Nenhum usuário autenticado');
 		}
 	} catch (err: any) {
-		console.error('[DEBUG] Erro ao verificar autenticação:', err);
+		console.error('[Auth] Erro ao verificar autenticação:', err);
 	} finally {
 		state.isCheckingAuth = false;
 		render();

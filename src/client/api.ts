@@ -125,7 +125,6 @@ export async function uploadConfigFile(type: 'http' | 'https', content: string):
 export async function checkAuth(): Promise<{ user?: { id: string; email: string; name?: string; picture?: string } } | null> {
   try {
     const authPath = import.meta.env.VITE_AUTH_CALLBACK_PATH || '/auth';
-    console.log('[API] Verificando auth em:', `${API_URL}${authPath}/session`);
 
     const response = await fetch(`${API_URL}${authPath}/session`, {
       credentials: 'include', // Importante: inclui cookies na requisição
@@ -134,22 +133,17 @@ export async function checkAuth(): Promise<{ user?: { id: string; email: string;
       },
     });
 
-    console.log('[API] Auth response status:', response.status);
-    console.log('[API] Auth response headers:', {
-      'set-cookie': response.headers.get('set-cookie'),
-      'content-type': response.headers.get('content-type'),
-    });
-
+    // Unauthenticated is not an error - it's expected behavior
     if (!response.ok) {
-      console.log('[API] Auth response não OK');
       return null;
     }
 
     const data = await response.json();
-    console.log('[API] Auth session data:', data);
 
-    return data.user ? data : null;
+    // Safe access to data.user
+    return data?.user ? data : null;
   } catch (error) {
+    // Only log real errors (network issues, parse errors, etc)
     console.error('[API] Erro ao verificar autenticação:', error);
     return null;
   }
