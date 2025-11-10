@@ -24,17 +24,16 @@ export interface LogEntry {
   data?: any;
 }
 
-// Get central logger URL from environment
-const LOGGER_URL = process.env.LOGGER_URL || 'http://localhost:3005/api/logs/ingest';
-
 // Create logger with HTTP transport to send logs to central server
+// URL is automatically configured in @vinicius/logger package
+// Default: https://logger.senavinicius.com/api/logs/ingest
+// Can be overridden via LOGGER_URL environment variable if needed
 const baseLogger = createLogger({
   level: process.env.LOG_LEVEL === 'debug' ? 'debug' : 'info',
   pretty: process.env.NODE_ENV !== 'production',
   sanitize: ['password', 'token', 'secret'],
   transports: [
     new HTTPTransport({
-      url: LOGGER_URL,
       retry: true,
       maxRetries: 3,
       timeout: 5000,
@@ -84,4 +83,4 @@ export const logger = {
 export { baseLogger };
 
 // Log de inicialização
-logger.info('SYSTEM', 'Logger inicializado - enviando logs para servidor central', { loggerUrl: LOGGER_URL });
+logger.info('SYSTEM', 'Logger inicializado - enviando logs para servidor central');

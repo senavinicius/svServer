@@ -143,7 +143,7 @@ app.post('/api/test-log', async (req, res) => {
 // TEMP: Debug endpoint to check logger configuration
 app.get('/api/logger-config', (req, res) => {
 	res.json({
-		loggerUrl: process.env.LOGGER_URL || 'http://localhost:3005/api/logs/ingest',
+		loggerUrl: process.env.LOGGER_URL || 'https://logger.senavinicius.com/api/logs/ingest (default)',
 		nodeEnv: process.env.NODE_ENV,
 		logLevel: process.env.LOG_LEVEL || 'info',
 	});
