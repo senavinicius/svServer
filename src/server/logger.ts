@@ -1,9 +1,9 @@
 /**
- * New logger implementation using @vinicius/logger
+ * Logger implementation using @vinicius/logger
+ * Sends logs to central logger server via HTTP
  * Maintains backward compatibility with old logger API
  */
-import { createLogger, SSETransport } from '@vinicius/logger';
-import type { LogEntry as NewLogEntry } from '@vinicius/logger';
+import { createLogger, HTTPTransport } from '@vinicius/logger';
 
 // Re-export old types for backward compatibility
 export const LogLevel = {
@@ -24,87 +24,23 @@ export interface LogEntry {
   data?: any;
 }
 
-// In-memory storage for backward compatibility
-const MAX_LOGS = 500;
-const logs: LogEntry[] = [];
+// Get central logger URL from environment
+const LOGGER_URL = process.env.LOGGER_URL || 'http://localhost:3005/api/logs/ingest';
 
-// Listeners for SSE
-type LogListener = (entry: LogEntry) => void;
-const listeners: Set<LogListener> = new Set();
-
-// Create SSE transport
-const sseTransport = new SSETransport();
-
-// Custom transport for in-memory storage + listeners
-class MemoryAndListenerTransport {
-  write(entry: NewLogEntry): void {
-    // Convert new format to old format
-    const oldEntry: LogEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      timestamp: entry.time,
-      level: entry.level.toUpperCase() as LogLevel,
-      operation: entry.category || 'SYSTEM',
-      message: entry.msg,
-      data: entry.data,
-    };
-
-    // Store in memory
-    logs.push(oldEntry);
-    if (logs.length > MAX_LOGS) {
-      logs.shift();
-    }
-
-    // Notify listeners
-    listeners.forEach(listener => {
-      try {
-        listener(oldEntry);
-      } catch (error) {
-        console.error('Erro ao notificar listener:', error);
-      }
-    });
-  }
-}
-
-// Create logger with both transports
-const memoryTransport = new MemoryAndListenerTransport();
-
+// Create logger with HTTP transport to send logs to central server
 export const internalLogger = createLogger({
   level: process.env.LOG_LEVEL === 'debug' ? 'debug' : 'info',
   pretty: process.env.NODE_ENV !== 'production',
   sanitize: ['password', 'token', 'secret'],
-  transports: [memoryTransport, sseTransport],
+  transports: [
+    new HTTPTransport({
+      url: LOGGER_URL,
+      retry: true,
+      maxRetries: 3,
+      timeout: 5000,
+    }),
+  ],
 });
-
-// Export SSE transport for route setup
-export { sseTransport };
-
-/**
- * Adiciona um listener para receber logs em tempo real
- */
-export function addLogListener(listener: LogListener): void {
-  listeners.add(listener);
-}
-
-/**
- * Remove um listener
- */
-export function removeLogListener(listener: LogListener): void {
-  listeners.delete(listener);
-}
-
-/**
- * Retorna todos os logs armazenados
- */
-export function getAllLogs(): LogEntry[] {
-  return [...logs];
-}
-
-/**
- * Limpa todos os logs
- */
-export function clearLogs(): void {
-  logs.length = 0;
-}
 
 /**
  * Logger com API compatível com versão antiga
@@ -144,4 +80,4 @@ export const logger = {
 };
 
 // Log de inicialização
-logger.info('SYSTEM', 'Logger inicializado com @vinicius/logger - logs em memória + SSE streaming');
+logger.info('SYSTEM', 'Logger inicializado - enviando logs para servidor central', { loggerUrl: LOGGER_URL });

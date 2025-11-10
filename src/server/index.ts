@@ -6,7 +6,6 @@ import { createDiagnosticsRoutes } from './routes/diagnostics.js';
 import { createDomainsRoutes } from './routes/domains.js';
 import { createSSLRoutes } from './routes/ssl.js';
 import { createConfigRoutes } from './routes/config.js';
-import { createLogsRoutes } from './routes/logs.js';
 import { logger } from './logger.js';
 
 // Error handlers globais
@@ -114,7 +113,6 @@ app.use('/api', createDiagnosticsRoutes(auth, systemStatus));
 app.use('/api', createDomainsRoutes(auth));
 app.use('/api', createSSLRoutes(auth));
 app.use('/api', createConfigRoutes(auth));
-app.use('/api', createLogsRoutes(auth));
 
 // Iniciar servidor
 app.listen(PORT, () => {
