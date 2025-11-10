@@ -472,9 +472,8 @@ async function clearLogsUI() {
 	}
 }
 
-/**
- * Conecta ao stream de logs em tempo real via SSE
- */
+// Log streaming removed - use central log dashboard at logs.senavinicius.com
+/*
 function connectToLogStream() {
 	const eventSource = new EventSource(`${API_URL}/api/logs/stream`);
 
@@ -533,7 +532,6 @@ async function init() {
 
 		loadDomains();
 		loadDiagnostics();
-		connectToLogStream();
 	} else {
 		console.log('[DEBUG] Usuário não autenticado, mostrando tela de login');
 		// Se não autenticado, apenas renderizar (mostrará tela de login)
