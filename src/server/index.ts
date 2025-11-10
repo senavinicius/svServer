@@ -75,11 +75,18 @@ const hasAuthConfig =
 let auth: ReturnType<typeof createAuthMiddleware>;
 
 if (hasAuthConfig) {
+	const prompt: 'consent' | 'select_account' | 'none' = 'select_account';
+	const accessType: 'online' | 'offline' = 'online';
+
 	const authConfig = {
 		googleClientId: process.env.GOOGLE_CLIENT_ID!,
 		googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
 		secret: process.env.AUTH_SECRET!,
 		googleCallbackPath: process.env.AUTH_GOOGLE_CALLBACK_PATH!,
+		oauth: {
+			prompt,
+			accessType,
+		},
 	};
 
 	// Cria as rotas de autenticação (signin, callback, signout, session, csrf)
@@ -94,6 +101,8 @@ if (hasAuthConfig) {
 	logger.info('AUTH', 'Sistema de autenticação inicializado');
 	console.log('✅ Sistema de autenticação inicializado');
 	console.log(`   Rotas auth em: ${authConfig.googleCallbackPath}/*`);
+	console.log(`   OAuth prompt: ${prompt}`);
+	console.log(`   OAuth access type: ${accessType}`);
 } else {
 	console.log('⚠️  Autenticação NÃO configurada (servidor funcionando sem login)');
 	console.log('   Configure no .env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET, AUTH_GOOGLE_CALLBACK_PATH');
