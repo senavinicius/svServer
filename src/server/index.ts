@@ -123,6 +123,16 @@ app.use('/api', createDomainsRoutes(auth));
 app.use('/api', createSSLRoutes(auth));
 app.use('/api', createConfigRoutes(auth));
 
+// TEMP: Test route for logger resilience
+app.post('/api/test-log', (req, res) => {
+	const { level, message, data } = req.body;
+	const logLevel = (level || 'info') as 'debug' | 'info' | 'warn' | 'error';
+
+	logger[logLevel]('TEST', message || 'Test log message', data || {});
+
+	res.json({ success: true, message: 'Log sent (check if it arrives at logger server)' });
+});
+
 // Iniciar servidor
 app.listen(PORT, () => {
 	console.log(`🚀 EC2 Manager API running on http://localhost:${PORT}`);

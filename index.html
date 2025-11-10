@@ -4,9 +4,98 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EC2 Manager</title>
+  <style>
+    #log-test-form {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #1a1a1a;
+      border: 2px solid #333;
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 9999;
+      color: #fff;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    #log-test-form h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #4CAF50;
+    }
+    #log-test-form input, #log-test-form select, #log-test-form button {
+      display: block;
+      width: 100%;
+      margin: 5px 0;
+      padding: 5px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+    }
+    #log-test-form button {
+      background: #4CAF50;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #log-test-form button:hover {
+      background: #45a049;
+    }
+    #log-test-result {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .success { background: #1b5e20; color: #4CAF50; }
+    .error { background: #b71c1c; color: #ef5350; }
+  </style>
 </head>
 <body>
+  <!-- TEMP: Logger Test Form -->
+  <div id="log-test-form">
+    <h3>🧪 Logger Test</h3>
+    <select id="log-level">
+      <option value="debug">DEBUG</option>
+      <option value="info" selected>INFO</option>
+      <option value="warn">WARN</option>
+      <option value="error">ERROR</option>
+    </select>
+    <input type="text" id="log-message" placeholder="Log message" value="Test message from frontend">
+    <button onclick="sendTestLog()">Send Log</button>
+    <div id="log-test-result"></div>
+  </div>
+
   <div id="app"></div>
   <script type="module" src="/src/client/main.ts"></script>
+  <script>
+    async function sendTestLog() {
+      const level = document.getElementById('log-level').value;
+      const message = document.getElementById('log-message').value;
+      const result = document.getElementById('log-test-result');
+
+      result.textContent = 'Sending...';
+      result.className = '';
+
+      try {
+        const response = await fetch('/api/test-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            level,
+            message,
+            data: { timestamp: new Date().toISOString(), test: true }
+          })
+        });
+
+        const data = await response.json();
+        result.textContent = `✓ ${data.message}`;
+        result.className = 'success';
+      } catch (error) {
+        result.textContent = `✗ ${error.message}`;
+        result.className = 'error';
+      }
+    }
+  </script>
 </body>
 </html>
